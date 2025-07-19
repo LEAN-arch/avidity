@@ -7,7 +7,7 @@ if 'app_data' not in st.session_state:
     st.error("Application data not loaded. Please return to the 'Global Command Center' home page to initialize the app.")
     st.stop()
 
-# Unpack data
+# Unpack data from the central session state
 app_data = st.session_state['app_data']
 batches = app_data['batches']
 
@@ -19,11 +19,13 @@ product_list = batches['Product'].unique()
 selected_product = st.selectbox("Select a Product Program to View", product_list, index=0)
 
 # --- CORRECTED LOGIC FOR IndexError ---
+# Filter for drug product lots of the selected product
 filtered_lots = batches[(batches['Product'] == selected_product) & (batches['Stage'] == 'Drug Product')]
 if filtered_lots.empty:
     st.warning(f"No Drug Product lots found for the {selected_product} program in the current dataset.")
     st.stop()  # Gracefully exit if no data to show
 
+# Select the most recent one to display
 latest_dp_lot = filtered_lots.sort_values('Date_Created', ascending=False).iloc[0]
 
 st.header(f"Genealogy for Drug Product Lot: `{latest_dp_lot['Lot_ID']}`")
@@ -52,15 +54,13 @@ st.markdown("""
 """)
 
 # --- CORRECTED LOGIC FOR ArrowInvalid Error ---
-# Data is now stored with numeric types. Display formatting is handled by Streamlit.
+# Data is now stored with numeric types. Display formatting is handled by Streamlit's column_config.
 cqa_data = [
     {'CQA': 'Purity by RP-HPLC (%)', 'DS Spec': '≥ 97.0', 'DP Spec': '≥ 97.0', 'DS Result': 98.1, 'DP Result': 97.8, 'Status': '✅ In Trend'},
     {'CQA': 'Conjugation Efficiency (%)', 'DS Spec': 'Report', 'DP Spec': 'Report', 'DS Result': 92.5, 'DP Result': 92.3, 'Status': '✅ In Trend'},
     {'CQA': 'Aggregate Content (%)', 'DS Spec': '≤ 2.0', 'DP Spec': '≤ 2.5', 'DS Result': 1.5, 'DP Result': 2.2, 'Status': '⚠️ Trending High'},
     {'CQA': 'Bioactivity (EC50, nM)', 'DS Spec': 'Report', 'DP Spec': '≤ 10.0', 'DS Result': 4.5, 'DP Result': 4.8, 'Status': '✅ In Trend'},
-    {'CQA': 'Endotoxin (EU/mL)', 'DS Spec': '≤ 5.0', 'DP Spec': '≤ 2.5', 'DS Result': 0.4, 'DP Result': 0.3, 'Status': '✅ In Trend'},
-    # NEW: Microbiology Integration
-    {'CQA': 'Bioburden (CFU/10mL)', 'DS Spec': '≤ 10', 'DP Spec': 'N/A (Sterile)', 'DS Result': 1.0, 'DP Result': 0.0, 'Status': '✅ In Trend'}
+    {'CQA': 'Endotoxin (EU/mL)', 'DS Spec': '≤ 5.0', 'DP Spec': '≤ 2.5', 'DS Result': 0.4, 'DP Result': 0.3, 'Status': '✅ In Trend'}
 ]
 cqa_df = pd.DataFrame(cqa_data)
 

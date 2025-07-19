@@ -85,6 +85,8 @@ with tab_perf:
         if not partner_batches.empty:
             sla = partner_batches['TAT_SLA'].iloc[0]
             fig_hist = px.histogram(partner_batches, x="Actual_TAT", nbins=15, title=f"Testing TAT Distribution (SLA: {sla} days)", color_discrete_sequence=['#955196'])
+            
+            # --- THIS IS THE CORRECTED LINE ---
             fig_hist.add_vline(x=sla, line_dash="dash", line_color="red", annotation_text="SLA")
             st.plotly_chart(fig_hist, use_container_width=True)
         else:
@@ -147,6 +149,7 @@ with tab_report:
             slide = prs.slides.add_slide(prs.slide_layouts[5]); slide.shapes.title.text = "Key Performance Metrics"
             
             try:
+                # Re-generate figures if they don't exist in the current scope
                 if 'fig_cpk' not in locals():
                     usl, lsl = 99.8, 98.0; mu, sigma = 99.1, 0.3; process_data = np.random.normal(mu, sigma, 200)
                     cpu = (usl - mu) / (3 * sigma); cpl = (mu - lsl) / (3 * sigma); cpk = min(cpu, cpl)
@@ -160,13 +163,17 @@ with tab_report:
                 st.warning(f"Could not generate Cpk chart image: {e}")
 
             try:
+                # This block defines fig_hist if it's not already defined
                 if 'fig_hist' not in locals() and not partner_batches.empty:
                     sla = partner_batches['TAT_SLA'].iloc[0]
                     fig_hist = px.histogram(partner_batches, x="Actual_TAT", nbins=15, title=f"Testing TAT Distribution (SLA: {sla} days)", color_discrete_sequence=['#955196'])
-                    fig_hist.add_vline(x=sla, line=dash="dash", line_color="red", annotation_text="SLA")
+                    # --- THIS IS THE SECOND CORRECTED LINE ---
+                    fig_hist.add_vline(x=sla, line_dash="dash", line_color="red", annotation_text="SLA")
                 
-                hist_img_bytes = fig_hist.to_image(format="png", width=800, height=400)
-                slide.shapes.add_picture(io.BytesIO(hist_img_bytes), Inches(5.0), Inches(1.5), width=Inches(4.5))
+                # Check if fig_hist was successfully created before trying to use it
+                if 'fig_hist' in locals():
+                    hist_img_bytes = fig_hist.to_image(format="png", width=800, height=400)
+                    slide.shapes.add_picture(io.BytesIO(hist_img_bytes), Inches(5.0), Inches(1.5), width=Inches(4.5))
             except Exception as e:
                 st.warning(f"Could not generate TAT chart image: {e}")
 

@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- ATOMIC DATA INITIALIZATION FUNCTION (EXTENDED) ---
+# --- ATOMIC DATA INITIALIZATION FUNCTION (WITH STRUCTURED MOCK DATA) ---
 @st.cache_data
 def generate_data():
     """Generates all necessary dataframes for the application."""
@@ -31,40 +31,54 @@ def generate_data():
     products = ['DM1 (AOC-1001)', 'DMD (AOC-1020)', 'FSHD (AOC-1044)']
     stages = ['Antibody Intermediate', 'Oligonucleotide', 'Drug Substance', 'Drug Product']
     statuses = ['Testing in Progress', 'Data Review Pending', 'Awaiting Release', 'Released']
+    
+    # --- SME ENHANCEMENT: Structured Mock Data Generation ---
+    # This new method guarantees a complete 'story' for each product.
+    batch_data_structured = [
+        # Complete chain for DM1
+        {'Product': products[0], 'Stage': stages[0], 'Partner': 'Pharma-Mfg'},
+        {'Product': products[0], 'Stage': stages[1], 'Partner': 'OligoSynth'},
+        {'Product': products[0], 'Stage': stages[2], 'Partner': 'Pharma-Mfg'},
+        {'Product': products[0], 'Stage': stages[3], 'Partner': 'VialFill Services'},
+        # Complete chain for DMD
+        {'Product': products[1], 'Stage': stages[0], 'Partner': 'Pharma-Mfg'},
+        {'Product': products[1], 'Stage': stages[1], 'Partner': 'OligoSynth'},
+        {'Product': products[1], 'Stage': stages[2], 'Partner': 'Pharma-Mfg'},
+        {'Product': products[1], 'Stage': stages[3], 'Partner': 'VialFill Services'},
+        # Complete chain for FSHD
+        {'Product': products[2], 'Stage': stages[0], 'Partner': 'Pharma-Mfg'},
+        {'Product': products[2], 'Stage': stages[1], 'Partner': 'OligoSynth'},
+        {'Product': products[2], 'Stage': stages[2], 'Partner': 'Pharma-Mfg'},
+        {'Product': products[2], 'Stage': stages[3], 'Partner': 'VialFill Services'},
+        # Add some extra in-progress lots for realism
+        {'Product': products[0], 'Stage': stages[2], 'Partner': 'Pharma-Mfg'},
+        {'Product': products[1], 'Stage': stages[1], 'Partner': 'OligoSynth'},
+    ]
+
     batch_data = []
-    for i in range(20):
-        prod = np.random.choice(products)
-        stage = np.random.choice(stages)
-        partner = np.random.choice(data['partners']['Partner'])
+    for i, record in enumerate(batch_data_structured):
         status = np.random.choice(statuses, p=[0.3, 0.2, 0.1, 0.4])
-        created_date = pd.Timestamp.now() - pd.Timedelta(days=np.random.randint(1, 45))
-        tat_sla = data['partners'][data['partners']['Partner'] == partner]['TAT_SLA'].iloc[0]
-        actual_tat = np.random.randint(tat_sla - 5, tat_sla + 10)
-        batch_data.append([f"{prod.split(' ')[0]}-{stage.split(' ')[0]}-{100+i}", prod, stage, partner, status, created_date, tat_sla, actual_tat])
+        created_date = pd.Timestamp.now() - pd.Timedelta(days=np.random.randint(5, 50))
+        tat_sla = data['partners'][data['partners']['Partner'] == record['Partner']]['TAT_SLA'].iloc[0]
+        actual_tat = np.random.randint(tat_sla - 5, tat_sla + 10) if status != 'Released' else np.random.randint(tat_sla - 7, tat_sla + 3)
+        lot_id = f"{record['Product'].split(' ')[0]}-{record['Stage'].split(' ')[0]}-{100+i}"
+        batch_data.append([lot_id, record['Product'], record['Stage'], record['Partner'], status, created_date, tat_sla, actual_tat])
+    
     data['batches'] = pd.DataFrame(batch_data, columns=['Lot_ID', 'Product', 'Stage', 'Partner', 'Status', 'Date_Created', 'TAT_SLA', 'Actual_TAT'])
 
+    # Create deviations linked to the new, valid lot IDs
+    valid_lot_ids = data['batches']['Lot_ID'].tolist()
     dev_data = []
     for i in range(15):
         partner = np.random.choice(data['partners']['Partner'])
-        prod = np.random.choice(products)
-        lot_id = f"{prod.split(' ')[0]}-DS-{100+i}"
+        lot_id = np.random.choice(valid_lot_ids)
+        # Infer product from the valid Lot ID
+        prod_from_lot = [p for p in products if p.split(' ')[0] in lot_id][0]
         status = np.random.choice(['New Event', 'Investigation', 'CAPA Plan', 'Closed'], p=[0.1, 0.4, 0.2, 0.3])
         age = np.random.randint(1, 60)
         dev_type = np.random.choice(['Deviation', 'OOS', 'OOT'])
-        dev_data.append([f"DEV-{2023-i}", lot_id, prod, partner, dev_type, status, age])
+        dev_data.append([f"DEV-{2023-i}", lot_id, prod_from_lot, partner, dev_type, status, age])
     data['deviations'] = pd.DataFrame(dev_data, columns=['Deviation_ID', 'Lot_ID', 'Product', 'Partner', 'Type', 'Status', 'Age_Days'])
-    
-    # NEW: Microbiology Data
-    micro_data = []
-    for date in pd.to_datetime(pd.date_range(start='2023-01-01', end='2023-09-30', freq='W')):
-        bioburden_count = np.random.poisson(2) # Low count
-        endotoxin_val = np.random.uniform(0.05, 0.2)
-        em_count = np.random.poisson(5) # Higher count for EM
-        if date.month in [6, 7]: em_count = np.random.poisson(15) # Simulate a summer excursion
-        micro_data.append([date, 'BioTest Labs', 'Bioburden (CFU/10mL)', bioburden_count, 10])
-        micro_data.append([date, 'BioTest Labs', 'Endotoxin (EU/mL)', endotoxin_val, 0.5])
-        micro_data.append([date, 'VialFill Services', 'EM Grade B (CFU/plate)', em_count, 10])
-    data['micro_data'] = pd.DataFrame(micro_data, columns=['Date', 'Partner', 'Test', 'Result', 'Limit'])
     
     return data
 
@@ -76,7 +90,6 @@ app_data = st.session_state['app_data']
 partners = app_data['partners']
 batches = app_data['batches']
 deviations = app_data['deviations']
-micro_data = app_data['micro_data']
 
 # --- SIDEBAR ---
 st.sidebar.image("https://www.aviditybiosciences.com/wp-content/themes/avidity/images/logo.svg", width=200)
@@ -102,16 +115,15 @@ with col3:
     at_risk_lots = batches[(batches['Status'] != 'Released') & (batches['Actual_TAT'] > batches['TAT_SLA'])].shape[0]
     st.metric("Lots At-Risk of Delay (TAT)", at_risk_lots, delta=f"{at_risk_lots - 2}", delta_color="inverse")
 with col4:
-    # NEW: Microbiology KPI
-    em_excursions = micro_data[(micro_data['Test'] == 'EM Grade B (CFU/plate)') & (micro_data['Result'] > micro_data['Limit'])].shape[0]
-    st.metric("Active Micro Excursions", em_excursions, delta=f"{em_excursions}", delta_color="inverse")
+    total_pulls = 7
+    st.metric("Upcoming Stability Pulls (14d)", total_pulls)
 
 with st.expander("SME Explanations for KPIs"):
     st.markdown("""
     - **Batches Pending QC Action:** Total number of lots across all products and stages that are currently in the QC workflow (Testing, Data Review, Release). *Relevance: Measures the overall workload and throughput of the QC function.*
     - **Active Deviations/OOS:** Total number of open quality events (Out-of-Specification, Deviations). *Relevance: A direct measure of the current problem-solving burden and potential quality risks across the network. Governed by **cGMP** and **ICH Q10**.*
     - **Lots At-Risk of Delay (TAT):** Number of active lots where the testing Turnaround Time has exceeded the contractual Service Level Agreement (SLA). *Relevance: A leading indicator of potential supply chain disruptions and timeline misses.*
-    - **Active Micro Excursions:** Number of Environmental Monitoring or product bioburden results exceeding action limits. *Relevance: A critical indicator of aseptic control for our injectable therapeutics, governed by **USP <1116>** and **EU GMP Annex 1**.*
+    - **Upcoming Stability Pulls:** Number of scheduled stability test points in the next 14 days. *Relevance: Proactively highlights critical, time-sensitive activities required for regulatory filings and product shelf-life determination per **ICH Q1A(R2)**.*
     """)
 st.divider()
 

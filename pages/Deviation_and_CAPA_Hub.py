@@ -43,7 +43,7 @@ with col1:
     st.subheader("OOS Root Cause Pareto Chart")
     st.markdown("- **Why (Actionability):** This Pareto chart is a powerful tool for continuous improvement per **ICH Q10**. By identifying the most frequent root causes for OOS results (the 'vital few'), we can focus our systemic improvement efforts for the greatest impact across the entire network.")
     rc_data = pd.DataFrame({
-        'Root Cause': ['Analyst Error', 'Method Variability', 'Instrument Malfunction', 'Reagent Issue', 'Column Degradation', 'Sample Handling'],
+        'Root Cause': ['Analyst Error', 'Method Variability', 'Instrument Malfunction', 'Reagent Issue', 'Sampling Error (Micro)', 'Column Degradation'],
         'Count': [12, 8, 5, 3, 2, 1]
     })
     fig_rc = px.bar(rc_data, x="Count", y="Root Cause", orientation='h', title="OOS Investigations by Root Cause", color="Count", color_continuous_scale=px.colors.sequential.Reds)

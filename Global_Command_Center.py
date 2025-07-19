@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- ATOMIC DATA INITIALIZATION FUNCTION (CORRECTED WITH DETERMINISTIC DATES) ---
+# --- ATOMIC DATA INITIALIZATION FUNCTION (WITH STRUCTURED & DETERMINISTIC DATA) ---
 @st.cache_data
 def generate_data():
     """Generates all necessary dataframes for the application."""
@@ -32,7 +32,7 @@ def generate_data():
     stages = ['Antibody Intermediate', 'Oligonucleotide', 'Drug Substance', 'Drug Product']
     statuses = ['Testing in Progress', 'Data Review Pending', 'Awaiting Release', 'Released']
     
-    # --- SME ENHANCEMENT: Structured Mock Data Generation ---
+    # Structured Mock Data Generation
     batch_data_structured = [
         {'Product': products[0], 'Stage': stages[0], 'Partner': 'Pharma-Mfg'}, {'Product': products[0], 'Stage': stages[1], 'Partner': 'OligoSynth'},
         {'Product': products[0], 'Stage': stages[2], 'Partner': 'Pharma-Mfg'}, {'Product': products[0], 'Stage': stages[3], 'Partner': 'VialFill Services'},
@@ -44,7 +44,6 @@ def generate_data():
     ]
 
     batch_data = []
-    # THIS IS THE KEY FIX: Use a fixed date to make data generation deterministic.
     static_now = pd.Timestamp('2023-10-27')
     for i, record in enumerate(batch_data_structured):
         status = np.random.choice(statuses, p=[0.3, 0.2, 0.1, 0.4])
@@ -67,6 +66,16 @@ def generate_data():
         dev_data.append([f"DEV-{2023-i}", lot_id, prod_from_lot, partner, dev_type, status, age])
     data['deviations'] = pd.DataFrame(dev_data, columns=['Deviation_ID', 'Lot_ID', 'Product', 'Partner', 'Type', 'Status', 'Age_Days'])
     
+    micro_data = []
+    for date in pd.to_datetime(pd.date_range(start='2023-01-01', end='2023-09-30', freq='W')):
+        bioburden_count = np.random.poisson(2); endotoxin_val = np.random.uniform(0.05, 0.2)
+        em_count = np.random.poisson(5)
+        if date.month in [6, 7]: em_count = np.random.poisson(15)
+        micro_data.append([date, 'BioTest Labs', 'Bioburden (CFU/10mL)', bioburden_count, 10])
+        micro_data.append([date, 'BioTest Labs', 'Endotoxin (EU/mL)', endotoxin_val, 0.5])
+        micro_data.append([date, 'VialFill Services', 'EM Grade B (CFU/plate)', em_count, 10])
+    data['micro_data'] = pd.DataFrame(micro_data, columns=['Date', 'Partner', 'Test', 'Result', 'Limit'])
+    
     return data
 
 # --- ROBUST STATE INITIALIZATION ---
@@ -77,6 +86,7 @@ app_data = st.session_state['app_data']
 partners = app_data['partners']
 batches = app_data['batches']
 deviations = app_data['deviations']
+micro_data = app_data['micro_data']
 
 # --- SIDEBAR ---
 st.sidebar.image("https://www.aviditybiosciences.com/wp-content/themes/avidity/images/logo.svg", width=200)
@@ -93,24 +103,22 @@ st.caption(f"Data Last Refreshed: {time.strftime('%Y-%m-%d %H:%M:%S')}")
 st.subheader("Network Health at a Glance")
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    pending_release = batches[batches['Status'] != 'Released'].shape[0]
-    st.metric("Batches Pending QC Action", pending_release)
+    st.metric("Batches Pending QC Action", batches[batches['Status'] != 'Released'].shape[0])
 with col2:
-    active_devs = deviations[deviations['Status'] != 'Closed'].shape[0]
-    st.metric("Active Deviations/OOS", active_devs)
+    st.metric("Active Deviations/OOS", deviations[deviations['Status'] != 'Closed'].shape[0])
 with col3:
     at_risk_lots = batches[(batches['Status'] != 'Released') & (batches['Actual_TAT'] > batches['TAT_SLA'])].shape[0]
     st.metric("Lots At-Risk of Delay (TAT)", at_risk_lots, delta=f"{at_risk_lots - 2}", delta_color="inverse")
 with col4:
-    total_pulls = 7
-    st.metric("Upcoming Stability Pulls (14d)", total_pulls)
+    em_excursions = micro_data[(micro_data['Test'] == 'EM Grade B (CFU/plate)') & (micro_data['Result'] > micro_data['Limit'])].shape[0]
+    st.metric("Active Micro Excursions", em_excursions, delta=f"{em_excursions}", delta_color="inverse")
 
 with st.expander("SME Explanations for KPIs"):
     st.markdown("""
-    - **Batches Pending QC Action:** Total number of lots across all products and stages that are currently in the QC workflow (Testing, Data Review, Release). *Relevance: Measures the overall workload and throughput of the QC function.*
-    - **Active Deviations/OOS:** Total number of open quality events. *Relevance: A direct measure of the current problem-solving burden and potential quality risks across the network. Governed by **cGMP** and **ICH Q10**.*
-    - **Lots At-Risk of Delay (TAT):** Number of active lots where the testing Turnaround Time has exceeded the contractual Service Level Agreement (SLA). *Relevance: A leading indicator of potential supply chain disruptions and timeline misses.*
-    - **Upcoming Stability Pulls:** Number of scheduled stability test points in the next 14 days. *Relevance: Proactively highlights critical, time-sensitive activities required for regulatory filings and product shelf-life determination per **ICH Q1A(R2)**.*
+    - **Batches Pending QC Action:** Measures the overall workload and throughput of the QC function.
+    - **Active Deviations/OOS:** A direct measure of the current problem-solving burden and potential quality risks across the network. Governed by **cGMP** and **ICH Q10**.
+    - **Lots At-Risk of Delay (TAT):** A leading indicator of potential supply chain disruptions and timeline misses.
+    - **Active Micro Excursions:** Number of Environmental Monitoring or product bioburden results exceeding action limits. A critical indicator of aseptic control for our injectable therapeutics, governed by **USP <1116>** and **EU GMP Annex 1**.
     """)
 st.divider()
 
@@ -118,7 +126,6 @@ col1, col2 = st.columns([2, 1.5])
 with col1:
     st.subheader("CMO/CTO Performance Matrix")
     st.markdown("- **Why:** This data-driven ranking provides an objective basis for partner management, QBRs, and identifying systemic risks. It directly addresses the need to 'Hold CMOs/CTOs accountable'.")
-    
     perf_summary = []
     for partner_name in partners['Partner']:
         partner_batches = batches[batches['Partner'] == partner_name]; partner_devs = deviations[deviations['Partner'] == partner_name]

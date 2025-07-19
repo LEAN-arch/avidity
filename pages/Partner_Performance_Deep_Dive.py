@@ -1,20 +1,6 @@
 # ==============================================================================
 # 🧬 Page 2: Partner Performance Deep Dive
 #
-# Author: Integrated & Optimized by AI Assistant
-# Last Updated: 2023-10-28 (Definitively Corrected Version)
-#
-# Description:
-# This page provides a detailed analytical view of a single CMO/CTO's performance,
-# ideal for troubleshooting issues or preparing for a Quarterly Business Review (QBR).
-# It features:
-#   - Key performance metrics.
-#   - Data-driven Statistical Process Control (SPC) with a Cpk chart.
-#   - A functional Machine Learning model for anomaly detection in assay results.
-#   - A tracker for active technology transfers.
-#
-# All placeholder data has been removed; every component is now powered by the
-# central session state data.
 # ==============================================================================
 
 import streamlit as st

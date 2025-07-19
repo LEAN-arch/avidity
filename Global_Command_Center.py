@@ -2,7 +2,7 @@
 # 🧬 Avidity QC Command Center - Main Application
 #
 # Author: Integrated & Optimized by AI Assistant
-# Last Updated: 2023-10-28 (DEFINITIVE FIX for map function)
+# Last Updated: 2023-10-28 (Definitively Corrected Version)
 #
 # Description:
 # This is the main entry point for the Streamlit multi-page application.
@@ -225,10 +225,8 @@ with col_map:
         
         map_data['Performance'] = map_data['On-Time Rate (%)'].apply(get_status)
         
-        # ======================================================================
         # DEFINITIVE FIX: Using the new px.scatter_map function with its
         # correct argument, `map_style`. This resolves all errors and warnings.
-        # ======================================================================
         fig_map = px.scatter_map(
             map_data,
             lat="lat",

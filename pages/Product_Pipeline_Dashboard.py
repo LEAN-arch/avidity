@@ -1,18 +1,6 @@
 # ==============================================================================
 # 🧬 Page 3: Lot Genealogy & CQA Dashboard
 #
-# Author: Integrated & Optimized by AI Assistant
-# Last Updated: 2023-10-27
-#
-# Description:
-# This page provides a holistic, lot-centric view of the manufacturing process,
-# tracking a single drug product lot back to its intermediates and displaying
-# the propagation of Critical Quality Attributes (CQAs). It includes:
-#   - A dynamic Sankey diagram to visualize the supply chain for a lot.
-#   - A CQA cascade table comparing results from Drug Substance to Drug Product.
-#
-# This page is now fully data-driven, with all data sourced from the central
-# session state. All previous bugs and placeholder functions have been removed.
 # ==============================================================================
 
 import streamlit as st
@@ -32,8 +20,6 @@ if 'app_data' not in st.session_state:
     st.stop()
 
 # --- 2. DATA UNPACKING ---
-# CRITICAL FIX: The required 'lot_lineage' and enriched 'batches_df' are now
-# correctly loaded from the session state, preventing the previous KeyError.
 app_data = st.session_state['app_data']
 batches_df = app_data['batches']
 lot_lineage_df = app_data['lot_lineage']
@@ -131,7 +117,6 @@ try:
     st.subheader("Critical Quality Attribute (CQA) Cascade")
     st.markdown("- **Why (Actionability):** By tracking CQAs through the process, we can understand the impact of manufacturing on final product quality. The 'Trending' status is a clear, data-driven action item. \n- **Regulatory:** This table is a simplified version of what would be included in the **CMC section of an IND or BLA filing**, as per **ICH Q8**.")
     
-    # REMOVED: The old, problematic generate_cqa_data function is gone.
     # We now call our new helper function that uses real data.
     cqa_cascade_df = create_cqa_cascade_table(selected_dp_lot_id, ds_lot_id)
 

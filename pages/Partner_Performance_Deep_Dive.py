@@ -5,6 +5,15 @@ import plotly.graph_objects as go
 import plotly.express as px
 import plotly.figure_factory as ff
 from sklearn.ensemble import IsolationForest
+from prophet import Prophet
+from pptx import Presentation
+from pptx.util import Inches
+import io
+import warnings
+
+# --- SUPPRESS DEPRECATION WARNINGS FOR CLEANER PRESENTATION ---
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 # --- ROBUST STATE CHECK ---
 if 'app_data' not in st.session_state:
@@ -16,6 +25,7 @@ app_data = st.session_state['app_data']
 partners = app_data['partners']
 batches = app_data['batches']
 deviations = app_data['deviations']
+micro_data = app_data['micro_data']
 
 # --- UI RENDER ---
 st.markdown("# 📈 Partner Performance Deep Dive")
@@ -24,10 +34,11 @@ st.markdown("This module provides a detailed analytical view of a single CMO/CTO
 selected_partner = st.selectbox("Select a Partner to Analyze", partners['Partner'].unique())
 partner_batches = batches[batches['Partner'] == selected_partner]
 partner_devs = deviations[deviations['Partner'] == selected_partner]
+partner_micro = micro_data[micro_data['Partner'] == selected_partner]
 
 st.header(f"Performance Analysis for: {selected_partner}")
 
-tab_perf, tab_ml, tab_transfers = st.tabs(["Performance Analytics (SPC/Cpk)", "ML Anomaly Detection", "Technology Transfers"])
+tab_perf, tab_micro, tab_predict, tab_report = st.tabs(["Performance Analytics (SPC/Cpk)", "🔬 Microbiology", "🔮 Predictive Analytics", "📋 QBR Report Generation"])
 
 with tab_perf:
     st.subheader("Key Performance & Quality Metrics")
@@ -70,41 +81,108 @@ with tab_perf:
             fig_hist.add_vline(x=sla, line_dash="dash", line_color="red", annotation_text="SLA")
             st.plotly_chart(fig_hist, use_container_width=True)
 
-with tab_ml:
-    st.header("Machine Learning: Assay Anomaly Detection")
-    st.markdown("""
-    - **What:** An unsupervised ML model (**Isolation Forest**) trained on historical results for a key stability-indicating assay. It learns the "normal" multivariate distribution of results.
-    - **How:** New batch data is fed to the model, which classifies it as a probable "Inlier" (statistically normal) or "Anomaly" (statistically unusual), even if it is still within the specification limits.
-    - **Why (Actionability):** This is a powerful tool for **proactive risk identification**. An anomalous result, even if in-spec, can be a leading indicator of method drift, instrument issues, or subtle changes in product quality. It provides a data-driven reason to place a batch on "for-information" stability or perform additional characterization, aligning with the principles of **ICH Q10 (Lifecycle Management)**.
-    """)
-    np.random.seed(0)
-    hist_data = pd.DataFrame(np.random.multivariate_normal([99.0, 1.5], [[0.1, 0.05], [0.05, 0.08]], 100), columns=['Purity', 'Main_Impurity'])
-    model = IsolationForest(contamination=0.05, random_state=42).fit(hist_data)
-    
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        st.subheader("Analyze New Batch Data")
-        purity_val = st.slider("Purity by HPLC (%)", 98.0, 100.0, 99.1, 0.01)
-        impurity_val = st.slider("Main Impurity Peak (%)", 0.1, 3.0, 1.45, 0.01)
-        new_batch = pd.DataFrame([[purity_val, impurity_val]], columns=['Purity', 'Main_Impurity'])
-        prediction = model.predict(new_batch)[0]
-        decision = "Anomaly Detected" if prediction == -1 else "Statistically Normal (Inlier)"
-        if decision == "Anomaly Detected":
-            st.error(f"**Result:** {decision}", icon="🚨")
-        else:
-            st.success(f"**Result:** {decision}", icon="✅")
-    with col2:
-        st.subheader("Historical Assay Performance")
-        fig_anomaly = px.scatter(hist_data, x="Purity", y="Main_Impurity", title="Historical Data Distribution", color_discrete_sequence=['royalblue'])
-        fig_anomaly.add_trace(go.Scatter(x=new_batch['Purity'], y=new_batch['Main_Impurity'], mode='markers', name='New Batch', marker=dict(color='red', size=15, symbol='star')))
-        st.plotly_chart(fig_anomaly, use_container_width=True)
+with tab_micro:
+    st.header("Microbiology & Environmental Monitoring Trends")
+    st.markdown("This section provides specific oversight for microbiological testing and environmental monitoring (EM), critical for ensuring the safety and sterility of our injectable drug products.")
+    if not partner_micro.empty:
+        st.subheader("Environmental Monitoring (EM) Control Chart")
+        st.markdown("- **What:** A c-Chart for microbial counts from Grade B cleanroom surfaces. It plots the number of Colony Forming Units (CFU) per plate against statistical Alert and Action limits. \n- **Why:** This is a primary tool for monitoring the state of control of an aseptic manufacturing environment. A point exceeding the Action Limit is a serious event that requires immediate investigation and potential production holds. \n- **Regulatory:** Aligns with **FDA aseptic processing guidelines** and **EU GMP Annex 1**.")
+        em_data = partner_micro[partner_micro['Test'] == 'EM Grade B (CFU/plate)']
+        
+        fig_em = go.Figure()
+        fig_em.add_trace(go.Scatter(x=em_data['Date'], y=em_data['Result'], mode='lines+markers', name='CFU Count', line=dict(color='royalblue')))
+        # Add alert and action limits
+        fig_em.add_hline(y=10, line=dict(color="orange", dash="dash"), name="Alert Limit")
+        fig_em.add_hline(y=20, line=dict(color="red", dash="dash"), name="Action Limit")
+        
+        # Highlight excursions
+        excursions = em_data[em_data['Result'] > 10]
+        fig_em.add_trace(go.Scatter(x=excursions['Date'], y=excursions['Result'], mode='markers', name='Excursions', marker=dict(color='red', size=12, symbol='x')))
 
-with tab_transfers:
-    st.header("Analytical Technology Transfer Status")
-    st.markdown("This tracker monitors the progress of all active analytical method transfers to this partner, ensuring clear communication and preventing delays in bringing new testing capabilities online.")
-    tt_data = [
-        {'Method': 'DMD Bioassay (EC50)', 'From': 'Avidity AD', 'Status': 'Protocol Execution', 'Target Date': '2024-09-15'},
-        {'Method': 'FSHD Purity by CE-SDS', 'From': 'Avidity AD', 'Status': 'Method Familiarization', 'Target Date': '2024-10-01'},
-        {'Method': 'DM1 Oligo Purity by IPRP-HPLC', 'From': 'Gene-Chem', 'Status': 'Completed', 'Target Date': '2024-07-30'},
-    ]
-    st.dataframe(tt_data, use_container_width=True)
+        fig_em.update_layout(
+            title="EM Trend: Grade B Surface Monitoring",
+            yaxis_title="CFU/plate",
+            xaxis_title="Date",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        st.plotly_chart(fig_em, use_container_width=True)
+    else:
+        st.info(f"No microbiology or EM data available for {selected_partner}.")
+
+with tab_predict:
+    st.header("Predictive Analytics")
+    st.subheader("Future Performance Forecast (Prophet)")
+    st.markdown("- **Why:** This shifts the SQE role from reactive to proactive. The forecast warns of potential TAT degradation, allowing for preventive actions.")
+    
+    @st.cache_data
+    def run_prophet_forecast(data, periods=12): # Forecasting 12 weeks
+        if data.empty or len(data) < 2: return None, None
+        prophet_df = data[['Date_Created', 'Actual_TAT']].rename(columns={'Date_Created': 'ds', 'Actual_TAT': 'y'})
+        prophet_df = prophet_df.groupby('ds').mean().reset_index() # Aggregate by day
+        m = Prophet(daily_seasonality=False, weekly_seasonality=True, yearly_seasonality=False)
+        m.fit(prophet_df)
+        future = m.make_future_dataframe(periods=periods, freq='W')
+        return m, m.predict(future)
+
+    model_prophet, forecast = run_prophet_forecast(partner_batches)
+    
+    if forecast is not None:
+        fig_forecast = go.Figure()
+        fig_forecast.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat'], mode='lines', name='Forecast TAT', line=dict(color='navy', dash='dash')))
+        st.plotly_chart(fig_forecast, use_container_width=True)
+    else:
+        st.info(f"Not enough data to generate a forecast for {selected_partner}.")
+
+with tab_report:
+    st.header("QBR Report Generation")
+    st.markdown("- **Why (Actionability):** This feature directly addresses the **'excellent written and verbal communication'** requirement by automating the creation of a standardized, data-driven Quarterly Business Review (QBR) deck. This saves hours of manual work and ensures consistent, professional communication with our external partners.")
+    
+    if st.button("Generate QBR PowerPoint Report"):
+        with st.spinner("Creating QBR Deck..."):
+            prs = Presentation()
+            # Title Slide
+            slide = prs.slides.add_slide(prs.slide_layouts[0])
+            slide.shapes.title.text = f"Quarterly Business Review: {selected_partner}"
+            slide.placeholders[1].text = f"Avidity Biosciences QC\nReport Generated: {pd.Timestamp.now().strftime('%Y-%m-%d')}"
+            
+            # Performance Slide
+            slide = prs.slides.add_slide(prs.slide_layouts[5])
+            slide.shapes.title.text = "Key Performance Metrics"
+            
+            # Add KPI images to the slide
+            try:
+                # Re-generate figures if they don't exist in the current scope
+                if 'fig_cpk' not in locals():
+                    usl, lsl = 99.8, 98.0; mu, sigma = 99.1, 0.3; process_data = np.random.normal(mu, sigma, 200)
+                    cpu = (usl - mu) / (3 * sigma); cpl = (mu - lsl) / (3 * sigma); cpk = min(cpu, cpl)
+                    fig_cpk = ff.create_distplot([process_data], ['Purity Data'], show_hist=True, show_rug=False, colors=['#444e86'])
+                    fig_cpk.add_vline(x=usl, line=dict(dash="dash", color="red"), name="USL"); fig_cpk.add_vline(x=lsl, line=dict(dash="dash", color="red"), name="LSL")
+                    fig_cpk.update_layout(title=f"Process Capability: Purity by HPLC (Cpk = {cpk:.2f})")
+                
+                cpk_img_bytes = fig_cpk.to_image(format="png", width=800, height=400)
+                slide.shapes.add_picture(io.BytesIO(cpk_img_bytes), Inches(0.5), Inches(1.5), width=Inches(4.5))
+            except Exception as e:
+                st.warning(f"Could not generate Cpk chart image: {e}")
+
+            try:
+                if 'fig_hist' not in locals() and not partner_batches.empty:
+                    sla = partner_batches['TAT_SLA'].iloc[0]
+                    fig_hist = px.histogram(partner_batches, x="Actual_TAT", nbins=15, title=f"Testing TAT Distribution (SLA: {sla} days)", color_discrete_sequence=['#955196'])
+                    fig_hist.add_vline(x=sla, line_dash="dash", line_color="red", annotation_text="SLA")
+                
+                hist_img_bytes = fig_hist.to_image(format="png", width=800, height=400)
+                slide.shapes.add_picture(io.BytesIO(hist_img_bytes), Inches(5.0), Inches(1.5), width=Inches(4.5))
+            except Exception as e:
+                st.warning(f"Could not generate TAT chart image: {e}")
+
+            ppt_buffer = io.BytesIO()
+            prs.save(ppt_buffer)
+            ppt_buffer.seek(0)
+            
+            st.success("Report generated successfully!")
+            st.download_button(
+                label="Download QBR Deck (.pptx)",
+                data=ppt_buffer,
+                file_name=f"QBR_{selected_partner.replace(' ', '_')}_{pd.Timestamp.now().strftime('%Y%m%d')}.pptx",
+                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            )

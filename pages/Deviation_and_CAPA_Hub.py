@@ -26,11 +26,15 @@ for i, stage in enumerate(stages):
         devs_in_stage = deviations[deviations['Status'] == stage]
         for index, dev in devs_in_stage.iterrows():
             age = dev['Age_Days']
-            if age > 30: st.error(f"**{dev['Deviation_ID']}**\n{dev['Partner']}\n`{age} days`")
-            elif age > 15: st.warning(f"**{dev['Deviation_ID']}**\n{dev['Partner']}\n`{age} days`")
+            if age > 30:
+                st.error(f"**{dev['Deviation_ID']}**\n{dev['Partner']}\n`{age} days`")
+            elif age > 15:
+                st.warning(f"**{dev['Deviation_ID']}**\n{dev['Partner']}\n`{age} days`")
             else:
                 with st.container(border=True):
-                    st.markdown(f"**{dev['Deviation_ID']}**"); st.caption(f"{dev['Partner']}"); st.caption(f"`{age} days`")
+                    st.markdown(f"**{dev['Deviation_ID']}**")
+                    st.caption(f"{dev['Partner']}")
+                    st.caption(f"`{age} days`")
 st.divider()
 
 col1, col2 = st.columns(2)
@@ -38,15 +42,18 @@ with col1:
     st.header("Actionable Analytics")
     st.subheader("OOS Root Cause Pareto Chart")
     st.markdown("- **Why (Actionability):** This Pareto chart is a powerful tool for continuous improvement per **ICH Q10**. By identifying the most frequent root causes for OOS results (the 'vital few'), we can focus our systemic improvement efforts for the greatest impact across the entire network.")
-    rc_data = pd.DataFrame({'Root Cause': ['Analyst Error', 'Method Variability', 'Instrument Malfunction', 'Reagent Issue', 'Column Degradation', 'Sample Handling'], 'Count': [12, 8, 5, 3, 2, 1]})
-    fig_rc = px.bar(rc_data, x="Count", y="Root Cause", orientation='h', title="OOS Investigations by Root Cause")
+    rc_data = pd.DataFrame({
+        'Root Cause': ['Analyst Error', 'Method Variability', 'Instrument Malfunction', 'Reagent Issue', 'Column Degradation', 'Sample Handling'],
+        'Count': [12, 8, 5, 3, 2, 1]
+    })
+    fig_rc = px.bar(rc_data, x="Count", y="Root Cause", orientation='h', title="OOS Investigations by Root Cause", color="Count", color_continuous_scale=px.colors.sequential.Reds)
     fig_rc.update_layout(yaxis={'categoryorder':'total ascending'})
     st.plotly_chart(fig_rc, use_container_width=True)
 with col2:
     st.header("Process Efficiency")
     st.subheader("Deviation Closure Cycle Time")
-    st.markdown("- **Why (Actionability):** This histogram tracks our team's and partners' efficiency in closing quality events. A long tail on this chart indicates a bottleneck in our investigation process, which can delay lot release and put timelines at risk.")
-    fig_cycle = px.histogram(deviations[deviations['Status'] == 'Closed'], x="Age_Days", nbins=10, title="Cycle Time for Closed Deviations")
+    st.markdown("- **Why (Actionability):** This histogram tracks our team's and partners' efficiency in closing quality events. A long tail on this chart (many events > 30 days) indicates a bottleneck in our investigation process, which can delay lot release and put clinical supply timelines at risk.")
+    fig_cycle = px.histogram(deviations[deviations['Status'] == 'Closed'], x="Age_Days", nbins=10, title="Cycle Time for Closed Deviations", color_discrete_sequence=['#dd5182'])
     fig_cycle.add_vline(x=30, line_dash="dash", line_color="red", annotation_text="30-Day Target")
     st.plotly_chart(fig_cycle, use_container_width=True)
 
@@ -63,6 +70,7 @@ with reg_col1:
     date_range_reg = st.date_input("Select Date Range", [pd.Timestamp('2023-08-01'), pd.Timestamp.now()])
 with reg_col2:
     if st.button("Generate Regulatory Data Summary"):
+        # Filter data based on selection
         filtered_batches = batches[(batches['Product'] == product_select_reg) & (batches['Date_Created'].dt.date.between(date_range_reg[0], date_range_reg[1]))]
         filtered_devs = deviations[(deviations['Product'] == product_select_reg)]
         st.subheader(f"Data Summary for {product_select_reg}")

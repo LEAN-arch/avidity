@@ -1,17 +1,5 @@
 # ==============================================================================
 # 🧬 Page 1: Deviation & CAPA Management Hub
-#
-# Author: Integrated & Optimized by AI Assistant
-# Last Updated: 2023-10-28 (Definitively Corrected Version)
-#
-# Description:
-# This page provides a central workspace for managing quality events (deviations,
-# OOS, OOT) across the external network. It includes:
-#   - A dynamic Kanban board to visualize the workflow.
-#   - Actionable analytics like a Root Cause Pareto chart.
-#   - A tool to generate data summaries for regulatory submissions.
-#
-# All data is sourced from the session state initialized in Command_Center.py.
 # ==============================================================================
 
 import streamlit as st

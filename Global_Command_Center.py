@@ -53,8 +53,8 @@ def generate_master_data():
     Generates all necessary, interconnected dataframes for the entire application.
     This is the single source of truth. All pages will pull data from this function's output.
     This function simulates a comprehensive and realistic data model for a biotech QC environment.
+    (CORRECTED & OPTIMIZED VERSION)
     """
-    # Use a fixed seed for reproducibility of the entire dataset.
     np.random.seed(42)
     static_now = pd.Timestamp('2023-10-27')
     data = {}
@@ -78,36 +78,26 @@ def generate_master_data():
     products = ['DM1 (AOC-1001)', 'DMD (AOC-1020)', 'FSHD (AOC-1044)']
     stages = ['Antibody Intermediate', 'Oligonucleotide', 'Drug Substance', 'Drug Product']
     batch_statuses = ['Testing in Progress', 'Data Review Pending', 'Awaiting Release', 'Released']
-    
-    # Corrected deviation statuses to match Kanban board
     dev_statuses = ['New Event', 'Investigation', 'CAPA Plan', 'Effectiveness Check', 'Closed']
     dev_types = ['Deviation', 'OOS', 'OOT']
     dev_root_causes = ['Analyst Error', 'Method Variability', 'Instrument Malfunction', 'Reagent Issue', 'Column Degradation', 'Sample Handling', 'Process Drift']
 
     # =================
-    # BATCHES, LINEAGE, and CQA Data (Integrated Generation)
-    # This is the core of the data model, creating realistic linked lots.
+    # BATCHES, LINEAGE (Initial Creation)
     # =================
     all_batches_data = []
     lot_lineage_data = []
-
-    for i in range(15): # Generate data for 15 final Drug Product lots
+    for i in range(15):
         product = np.random.choice(products)
         prod_prefix = product.split(' ')[0]
-
-        # 1. Create Intermediates
         mab_lot_id = f"{prod_prefix}-Antibody-{100+i}"
         oligo_lot_id = f"{prod_prefix}-Oligo-{200+i}"
         all_batches_data.append({'Lot_ID': mab_lot_id, 'Product': product, 'Stage': 'Antibody Intermediate', 'Partner': 'Pharma-Mfg'})
         all_batches_data.append({'Lot_ID': oligo_lot_id, 'Product': product, 'Stage': 'Oligonucleotide', 'Partner': 'OligoSynth'})
-
-        # 2. Create Drug Substance, linking to intermediates
         ds_lot_id = f"{prod_prefix}-DS-{300+i}"
         all_batches_data.append({'Lot_ID': ds_lot_id, 'Product': product, 'Stage': 'Drug Substance', 'Partner': 'Pharma-Mfg'})
         lot_lineage_data.append({'parent_lot': mab_lot_id, 'child_lot': ds_lot_id})
         lot_lineage_data.append({'parent_lot': oligo_lot_id, 'child_lot': ds_lot_id})
-
-        # 3. Create Drug Product, linking to Drug Substance
         dp_lot_id = f"{prod_prefix}-DP-{400+i}"
         all_batches_data.append({'Lot_ID': dp_lot_id, 'Product': product, 'Stage': 'Drug Product', 'Partner': 'VialFill Services'})
         lot_lineage_data.append({'parent_lot': ds_lot_id, 'child_lot': dp_lot_id})
@@ -115,65 +105,64 @@ def generate_master_data():
     data['batches'] = pd.DataFrame(all_batches_data)
     data['lot_lineage'] = pd.DataFrame(lot_lineage_data)
 
-    # =================
-    # Enrich Batches with Status, Dates, TAT, and CQA Data
-    # =================
-    # Vectorized merge to add partner-specific SLA
-    data['batches'] = pd.merge(data['batches'], data['partners'][['Partner', 'TAT_SLA']], on='Partner', how='left')
-
-    # Apply dynamic attributes and CQA data
-    enriched_rows = []
-    for _, row in data['batches'].iterrows():
-        # Use lot_id for deterministic "randomness"
-        lot_seed = int(sum(ord(c) for c in row['Lot_ID']))
-        np.random.seed(lot_seed)
-
-        row['Status'] = np.random.choice(batch_statuses, p=[0.25, 0.2, 0.15, 0.4])
-        row['Date_Created'] = static_now - pd.Timedelta(days=np.random.randint(10, 120))
-        
-        # Simulate TAT
-        sla = row['TAT_SLA']
-        row['Actual_TAT'] = np.random.randint(sla - 5, sla + 10) if row['Status'] != 'Released' else np.random.randint(sla - 7, sla + 3)
-        
-        # Add Date_Released for a subset of released lots for charting
-        if row['Status'] == 'Released':
-            row['Date_Released'] = row['Date_Created'] + pd.Timedelta(days=row['Actual_TAT'])
-        else:
-            row['Date_Released'] = pd.NaT
-
-        # Generate CQA data (used by Partner Deep Dive & Lot Genealogy pages)
-        # This makes Cpk and ML Anomaly detection possible with real data
-        row['Purity'] = np.random.normal(99.0, 0.5)
-        row['Main_Impurity'] = np.random.normal(1.2, 0.3)
-        row['Aggregate_Content'] = np.random.normal(1.5, 0.4)
-        
-        enriched_rows.append(row)
+    # ==============================================================================
+    # BUG FIX & OPTIMIZATION: Enrich Batches with Status, Dates, TAT, and CQA Data
+    #
+    # The previous version used a slow and buggy `for` loop. This new version uses
+    # fast, reliable, and vectorized pandas/numpy operations. This is the fix for
+    # the KeyError: 'Actual_TAT'.
+    # ==============================================================================
     
-    data['batches'] = pd.DataFrame(enriched_rows)
+    # Create a local alias for convenience
+    df = data['batches']
+    num_batches = len(df)
 
+    # 1. Merge partner data to get TAT_SLA
+    df = pd.merge(df, data['partners'][['Partner', 'TAT_SLA']], on='Partner', how='left')
+
+    # 2. Assign Statuses and Creation Dates
+    df['Status'] = np.random.choice(batch_statuses, size=num_batches, p=[0.25, 0.2, 0.15, 0.4])
+    df['Date_Created'] = static_now - pd.to_timedelta(np.random.randint(10, 120, size=num_batches), unit='d')
+
+    # 3. Generate Actual_TAT based on Status and SLA (Vectorized)
+    is_released = (df['Status'] == 'Released')
+    # For lots not released, TAT is around the SLA
+    tat_not_released = df['TAT_SLA'] + np.random.randint(-5, 10, size=num_batches)
+    # For released lots, TAT is generally better
+    tat_released = df['TAT_SLA'] + np.random.randint(-7, 3, size=num_batches)
+    # Use np.where to apply conditions efficiently
+    df['Actual_TAT'] = np.where(is_released, tat_released, tat_not_released)
+    
+    # 4. Generate Date_Released
+    df['Date_Released'] = pd.NaT # Initialize column with Not a Time
+    df.loc[is_released, 'Date_Released'] = df.loc[is_released, 'Date_Created'] + pd.to_timedelta(df.loc[is_released, 'Actual_TAT'], unit='d')
+
+    # 5. Generate CQA Data
+    df['Purity'] = np.random.normal(99.0, 0.5, size=num_batches)
+    df['Main_Impurity'] = np.random.normal(1.2, 0.3, size=num_batches)
+    df['Aggregate_Content'] = np.random.normal(1.5, 0.4, size=num_batches)
+
+    # 6. Update the master data dictionary with the fully formed DataFrame
+    data['batches'] = df
+    
     # =================
     # DEVIATIONS (Enriched with Root Cause)
     # =================
     dev_data = []
     valid_lot_ids = data['batches']['Lot_ID'].tolist()
-    for i in range(40): # More deviations for better stats
+    for i in range(40):
         lot_id = np.random.choice(valid_lot_ids)
         batch_info = data['batches'][data['batches']['Lot_ID'] == lot_id].iloc[0]
-        
         dev_data.append({
-            'Deviation_ID': f"DEV-{2023-i}",
-            'Lot_ID': lot_id,
-            'Product': batch_info['Product'],
-            'Partner': batch_info['Partner'],
-            'Type': np.random.choice(dev_types, p=[0.5, 0.3, 0.2]),
+            'Deviation_ID': f"DEV-{2023-i}", 'Lot_ID': lot_id, 'Product': batch_info['Product'],
+            'Partner': batch_info['Partner'], 'Type': np.random.choice(dev_types, p=[0.5, 0.3, 0.2]),
             'Status': np.random.choice(dev_statuses, p=[0.1, 0.3, 0.2, 0.1, 0.3]),
-            'Age_Days': np.random.randint(1, 90),
-            'Root_Cause': np.random.choice(dev_root_causes) # Essential for Pareto Chart
+            'Age_Days': np.random.randint(1, 90), 'Root_Cause': np.random.choice(dev_root_causes)
         })
     data['deviations'] = pd.DataFrame(dev_data)
 
     # =================
-    # TECHNOLOGY TRANSFERS (For Partner Deep Dive Page)
+    # TECHNOLOGY TRANSFERS
     # =================
     tt_data = [
         {'Partner': 'BioTest Labs', 'Method': 'DMD Bioassay (EC50)', 'From': 'Avidity AD', 'Status': 'Protocol Execution', 'Target Date': '2024-09-15'},
@@ -184,6 +173,7 @@ def generate_master_data():
     data['tech_transfers'] = pd.DataFrame(tt_data)
 
     return data
+
 
 # --- 4. ROBUST STATE INITIALIZATION ---
 # Initialize data only once and store it in the session state.
@@ -331,6 +321,3 @@ with col_map:
 
     else:
         st.info("Performance data not available to render map.")
-    # This line will now work correctly
-    st.map(partners[['lat', 'lon']], zoom=1)
-    st.caption("Partner locations are color-coded by their current overall performance status.")

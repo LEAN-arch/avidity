@@ -8,7 +8,7 @@ if 'app_data' not in st.session_state:
     st.error("Application data not loaded. Please return to the 'Global Command Center' home page to initialize the app.")
     st.stop()
 
-# Unpack data
+# Unpack data from the central session state
 app_data = st.session_state['app_data']
 batches = app_data['batches']
 lot_lineage = app_data['lot_lineage']
@@ -17,13 +17,19 @@ lot_lineage = app_data['lot_lineage']
 @st.cache_data
 def generate_cqa_data(product_name, lot_id):
     """Generates realistic and unique CQA data for a specific lot."""
+    # Use the lot_id to seed the random number generator for consistency
     seed = int(sum(ord(c) for c in lot_id))
     np.random.seed(seed)
     
-    purity_ds = np.random.uniform(97.5, 99.0); conjugation_ds = np.random.uniform(91.0, 94.0)
-    aggregate_ds = np.random.uniform(1.0, 1.8); bioactivity_ds = np.random.uniform(4.0, 6.0)
-    endotoxin_ds = np.random.uniform(0.1, 0.5); bioburden_ds = np.random.randint(0, 3)
-    
+    # Base values
+    purity_ds = np.random.uniform(97.5, 99.0)
+    conjugation_ds = np.random.uniform(91.0, 94.0)
+    aggregate_ds = np.random.uniform(1.0, 1.8)
+    bioactivity_ds = np.random.uniform(4.0, 6.0)
+    endotoxin_ds = np.random.uniform(0.1, 0.5)
+    bioburden_ds = np.random.randint(0, 3)
+
+    # Simulate slight changes from Drug Substance (DS) to Drug Product (DP)
     purity_dp = purity_ds - np.random.uniform(0.1, 0.3)
     aggregate_dp = aggregate_ds + np.random.uniform(0.2, 0.4)
     
@@ -44,6 +50,7 @@ st.markdown("This dashboard provides a holistic, lot-centric view of the manufac
 product_list = sorted(batches['Product'].unique())
 selected_product = st.selectbox("Select a Product Program to View", product_list, index=0)
 
+# --- CORRECTED LOGIC FOR IndexError ---
 filtered_lots = batches[(batches['Product'] == selected_product) & (batches['Stage'] == 'Drug Product')]
 if filtered_lots.empty:
     st.warning(f"No Drug Product lots found for the {selected_product} program in the current dataset."); st.stop()
@@ -73,6 +80,7 @@ except (IndexError, KeyError):
 st.subheader("Critical Quality Attribute (CQA) Cascade")
 st.markdown("- **Why (Actionability):** By tracking CQAs through the process, we can understand the impact of **Critical Process Parameters (CPPs)** at each CMO on the final product quality. The 'Trending High' status for Aggregates is a clear, data-driven action item for the process development team. \n- **Regulatory:** This table is a simplified version of what would be included in the **CMC section of an IND or BLA filing**, as per **ICH Q8 (Pharmaceutical Development)**.")
 
+# --- DYNAMIC CQA TABLE ---
 cqa_df = generate_cqa_data(selected_product, latest_dp_lot['Lot_ID'])
 st.dataframe(
     cqa_df, use_container_width=True,

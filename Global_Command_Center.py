@@ -2,7 +2,7 @@
 # 🧬 Avidity QC Command Center - Main Application
 #
 # Author: Integrated & Optimized by AI Assistant
-# Last Updated: 2023-10-28 (with warning fixes)
+# Last Updated: 2023-10-28 (with FINAL warning and error fixes)
 #
 # Description:
 # This is the main entry point for the Streamlit multi-page application.
@@ -172,7 +172,6 @@ with col_main:
     st.markdown("- **Why:** This data-driven ranking provides an objective basis for partner management and identifying systemic risks.")
     
     if not batches_df.empty and not deviations_df.empty:
-        # WARNING FIX: Added include_groups=False to the apply call.
         on_time_agg = batches_df.groupby('Partner').apply(
             lambda x: (x['Actual_TAT'] <= x['TAT_SLA']).mean() * 100,
             include_groups=False
@@ -226,8 +225,10 @@ with col_map:
         
         map_data['Performance'] = map_data['On-Time Rate (%)'].apply(get_status)
         
-        # WARNING FIX: Replaced px.scatter_mapbox with px.scatter_map
-        # and mapbox_style with style.
+        # ======================================================================
+        # FINAL ERROR FIX: Updated to px.scatter_map, but kept the correct
+        # argument name `mapbox_style`. The argument `style` was incorrect.
+        # ======================================================================
         fig_map = px.scatter_map(
             map_data,
             lat="lat",
@@ -242,7 +243,7 @@ with col_map:
             },
             zoom=1.2,
             height=300,
-            style="carto-positron"
+            mapbox_style="carto-positron" 
         )
         fig_map.update_layout(margin=dict(l=0, r=0, t=0, b=0), legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
         st.plotly_chart(fig_map, use_container_width=True)

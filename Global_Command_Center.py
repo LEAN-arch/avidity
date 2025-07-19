@@ -1,6 +1,5 @@
 # ==============================================================================
 # 🧬 Avidity QC Command Center - Main Application
-#
 # ==============================================================================
 
 import streamlit as st
@@ -49,26 +48,55 @@ def generate_master_data():
     dev_types = ['Deviation', 'OOS', 'OOT']
     dev_root_causes = ['Analyst Error', 'Method Variability', 'Instrument Malfunction', 'Reagent Issue', 'Column Degradation', 'Sample Handling', 'Process Drift']
 
-    all_batches_data = []
+    # =================
+    # BATCHES, LINEAGE (Manufacturing Flow)
+    # =================
+    mfg_batches_data = []
     lot_lineage_data = []
     for i in range(15):
         product = np.random.choice(products)
         prod_prefix = product.split(' ')[0]
         mab_lot_id = f"{prod_prefix}-Antibody-{100+i}"
         oligo_lot_id = f"{prod_prefix}-Oligo-{200+i}"
-        all_batches_data.append({'Lot_ID': mab_lot_id, 'Product': product, 'Stage': 'Antibody Intermediate', 'Partner': 'Pharma-Mfg'})
-        all_batches_data.append({'Lot_ID': oligo_lot_id, 'Product': product, 'Stage': 'Oligonucleotide', 'Partner': 'OligoSynth'})
+        mfg_batches_data.append({'Lot_ID': mab_lot_id, 'Product': product, 'Stage': 'Antibody Intermediate', 'Partner': 'Pharma-Mfg'})
+        mfg_batches_data.append({'Lot_ID': oligo_lot_id, 'Product': product, 'Stage': 'Oligonucleotide', 'Partner': 'OligoSynth'})
         ds_lot_id = f"{prod_prefix}-DS-{300+i}"
-        all_batches_data.append({'Lot_ID': ds_lot_id, 'Product': product, 'Stage': 'Drug Substance', 'Partner': 'Pharma-Mfg'})
+        mfg_batches_data.append({'Lot_ID': ds_lot_id, 'Product': product, 'Stage': 'Drug Substance', 'Partner': 'Pharma-Mfg'})
         lot_lineage_data.append({'parent_lot': mab_lot_id, 'child_lot': ds_lot_id})
         lot_lineage_data.append({'parent_lot': oligo_lot_id, 'child_lot': ds_lot_id})
         dp_lot_id = f"{prod_prefix}-DP-{400+i}"
-        all_batches_data.append({'Lot_ID': dp_lot_id, 'Product': product, 'Stage': 'Drug Product', 'Partner': 'VialFill Services'})
+        mfg_batches_data.append({'Lot_ID': dp_lot_id, 'Product': product, 'Stage': 'Drug Product', 'Partner': 'VialFill Services'})
         lot_lineage_data.append({'parent_lot': ds_lot_id, 'child_lot': dp_lot_id})
 
-    data['batches'] = pd.DataFrame(all_batches_data)
     data['lot_lineage'] = pd.DataFrame(lot_lineage_data)
     
+    # ==============================================================================
+    # POPULATION FIX: Create Supplemental Analytical Batches
+    # This ensures that CTOs like BioTest Labs and Gene-Chem have data for the
+    # Partner Deep Dive page, populating the Cpk and ML Anomaly tabs for them.
+    # ==============================================================================
+    analytical_batches_data = []
+    analytical_partners = ['BioTest Labs', 'Gene-Chem']
+    for partner in analytical_partners:
+        for i in range(np.random.randint(5, 10)): # Create 5 to 10 test records for each
+            product = np.random.choice(products)
+            prod_prefix = product.split(' ')[0]
+            lot_id = f"{prod_prefix}-ANL-{partner.replace(' ', '')[:4]}-{500+i}"
+            analytical_batches_data.append({
+                'Lot_ID': lot_id,
+                'Product': product,
+                'Stage': 'Analytical Testing', # A new, specific stage
+                'Partner': partner
+            })
+
+    # Combine the manufacturing and analytical batches into one master list
+    all_batches = mfg_batches_data + analytical_batches_data
+    data['batches'] = pd.DataFrame(all_batches)
+
+    # ==============================================================
+    # ENRICH BATCHES (Vectorized Operations)
+    # This section now operates on the fully populated batch list.
+    # ==============================================================
     df = data['batches']
     num_batches = len(df)
     df = pd.merge(df, data['partners'][['Partner', 'TAT_SLA']], on='Partner', how='left')
@@ -85,25 +113,43 @@ def generate_master_data():
     df['Aggregate_Content'] = np.random.normal(1.5, 0.4, size=num_batches)
     data['batches'] = df
     
+    # =================
+    # DEVIATIONS
+    # This will now naturally include all partners since they all have lots.
+    # =================
     dev_data = []
-    valid_lot_ids = data['batches']['Lot_ID'].tolist()
-    for i in range(40):
-        lot_id = np.random.choice(valid_lot_ids)
-        batch_info = data['batches'][data['batches']['Lot_ID'] == lot_id].iloc[0]
+    for i in range(50): # Increased count for better distribution
+        # Select a random batch and use its info to create a linked deviation
+        random_batch = data['batches'].sample(1).iloc[0]
         dev_data.append({
-            'Deviation_ID': f"DEV-{2023-i}", 'Lot_ID': lot_id, 'Product': batch_info['Product'],
-            'Partner': batch_info['Partner'], 'Type': np.random.choice(dev_types, p=[0.5, 0.3, 0.2]),
+            'Deviation_ID': f"DEV-{2023-i}", 'Lot_ID': random_batch['Lot_ID'], 'Product': random_batch['Product'],
+            'Partner': random_batch['Partner'], 'Type': np.random.choice(dev_types, p=[0.5, 0.3, 0.2]),
             'Status': np.random.choice(dev_statuses, p=[0.1, 0.3, 0.2, 0.1, 0.3]),
             'Age_Days': np.random.randint(1, 90), 'Root_Cause': np.random.choice(dev_root_causes)
         })
     data['deviations'] = pd.DataFrame(dev_data)
 
-    tt_data = [
-        {'Partner': 'BioTest Labs', 'Method': 'DMD Bioassay (EC50)', 'From': 'Avidity AD', 'Status': 'Protocol Execution', 'Target Date': '2024-09-15'},
-        {'Partner': 'BioTest Labs', 'Method': 'FSHD Purity by CE-SDS', 'From': 'Avidity AD', 'Status': 'Method Familiarization', 'Target Date': '2024-10-01'},
-        {'Partner': 'Gene-Chem', 'Method': 'DM1 Oligo Purity by IPRP-HPLC', 'From': 'OligoSynth', 'Status': 'Completed', 'Target Date': '2024-07-30'},
-        {'Partner': 'VialFill Services', 'Method': 'Sterility Testing', 'From': 'BioTest Labs', 'Status': 'Protocol Development', 'Target Date': '2024-11-20'},
-    ]
+    # ==============================================================================
+    # POPULATION FIX: Dynamically Generate Technology Transfers
+    # This loop replaces the static list and guarantees every partner has at least
+    # one transfer record for the Partner Deep Dive page.
+    # ==============================================================================
+    tt_data = []
+    methods_list = ['Potency Assay (ELISA)', 'Purity by CE-SDS', 'Bioburden', 'Endotoxin (LAL)', 'Identity by Peptide Map', 'Host-Cell Protein Assay']
+    from_list = ['Avidity AD', 'Avidity PD', 'Gene-Chem', 'BioTest Labs']
+    status_list = ['Protocol Development', 'Method Familiarization', 'Protocol Execution', 'Method Validation', 'Completed']
+    
+    for partner_name in data['partners']['Partner']:
+        num_transfers = np.random.randint(1, 3) # Assign 1 or 2 transfers per partner
+        for _ in range(num_transfers):
+            target_date = static_now + pd.Timedelta(days=np.random.randint(30, 365))
+            tt_data.append({
+                'Partner': partner_name,
+                'Method': np.random.choice(methods_list),
+                'From': np.random.choice(from_list),
+                'Status': np.random.choice(status_list, p=[0.2, 0.2, 0.3, 0.1, 0.2]),
+                'Target Date': target_date.strftime('%Y-%m-%d')
+            })
     data['tech_transfers'] = pd.DataFrame(tt_data)
 
     return data
@@ -170,7 +216,9 @@ with col_main:
         oos_agg = oos_agg.rename('OOS Rate (%)').fillna(0)
         late_devs_agg = deviations_df[deviations_df['Age_Days'] > 30].groupby('Partner').size().rename('Deviations >30d')
 
-        perf_df = pd.concat([on_time_agg, oos_agg, late_devs_agg], axis=1).fillna(0).reset_index()
+        # Use reindex to ensure all partners from the main partners_df are included
+        all_partners_index = partners_df.set_index('Partner').index
+        perf_df = pd.concat([on_time_agg, oos_agg, late_devs_agg], axis=1).reindex(all_partners_index).fillna(0).reset_index()
         perf_df.rename(columns={'index': 'Partner'}, inplace=True)
         
         st.dataframe(perf_df, use_container_width=True, hide_index=True,
@@ -214,8 +262,6 @@ with col_map:
         
         map_data['Performance'] = map_data['On-Time Rate (%)'].apply(get_status)
         
-        # DEFINITIVE FIX: Using the new px.scatter_map function with its
-        # correct argument, `map_style`. This resolves all errors and warnings.
         fig_map = px.scatter_map(
             map_data,
             lat="lat",

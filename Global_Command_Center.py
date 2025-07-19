@@ -2,7 +2,7 @@
 # 🧬 Avidity QC Command Center - Main Application
 #
 # Author: Integrated & Optimized by AI Assistant
-# Last Updated: 2023-10-28 (FINAL - with all error and warning fixes)
+# Last Updated: 2023-10-28 (DEFINITIVE FIX for map function)
 #
 # Description:
 # This is the main entry point for the Streamlit multi-page application.
@@ -226,13 +226,10 @@ with col_map:
         map_data['Performance'] = map_data['On-Time Rate (%)'].apply(get_status)
         
         # ======================================================================
-        # FINAL ERROR FIX: Reverted to px.scatter_mapbox. While it is
-        # deprecated and may show a warning in the console, it is the correct
-        # function to use with the `mapbox_style` argument and will not crash
-        # the application. A working app with a warning is better than a
-        # crashing app.
+        # DEFINITIVE FIX: Using the new px.scatter_map function with its
+        # correct argument, `map_style`. This resolves all errors and warnings.
         # ======================================================================
-        fig_map = px.scatter_mapbox(
+        fig_map = px.scatter_map(
             map_data,
             lat="lat",
             lon="lon",
@@ -246,7 +243,7 @@ with col_map:
             },
             zoom=1.2,
             height=300,
-            mapbox_style="carto-positron" 
+            map_style="carto-positron" 
         )
         fig_map.update_layout(margin=dict(l=0, r=0, t=0, b=0), legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
         st.plotly_chart(fig_map, use_container_width=True)

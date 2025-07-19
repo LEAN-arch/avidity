@@ -13,12 +13,11 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- ATOMIC DATA INITIALIZATION FUNCTION (CORRECTED) ---
+# --- ATOMIC DATA INITIALIZATION FUNCTION (DEFINITIVE CORRECTION) ---
 @st.cache_data
 def generate_data():
-    """Generates all necessary dataframes for the application."""
+    """Generates all necessary dataframes for the application with a corrected data model."""
     data = {}
-    # --- THIS IS THE CORRECTED DATAFRAME DEFINITION ---
     data['partners'] = pd.DataFrame({
         'Partner': ['Pharma-Mfg', 'BioTest Labs', 'Gene-Chem', 'OligoSynth', 'VialFill Services'],
         'Type': ['CMO', 'CTO', 'CTO', 'CMO', 'CMO'],
@@ -33,25 +32,17 @@ def generate_data():
     stages = ['Antibody Intermediate', 'Oligonucleotide', 'Drug Substance', 'Drug Product']
     statuses = ['Testing in Progress', 'Data Review Pending', 'Awaiting Release', 'Released']
     
-    batch_data_structured = [
-        {'Product': products[0], 'Stage': stages[0], 'Partner': 'Pharma-Mfg'}, {'Product': products[0], 'Stage': stages[1], 'Partner': 'OligoSynth'},
-        {'Product': products[0], 'Stage': stages[2], 'Partner': 'Pharma-Mfg'}, {'Product': products[0], 'Stage': stages[3], 'Partner': 'VialFill Services'},
-        {'Product': products[1], 'Stage': stages[0], 'Partner': 'Pharma-Mfg'}, {'Product': products[1], 'Stage': stages[1], 'Partner': 'OligoSynth'},
-        {'Product': products[1], 'Stage': stages[2], 'Partner': 'Pharma-Mfg'}, {'Product': products[1], 'Stage': stages[3], 'Partner': 'VialFill Services'},
-        {'Product': products[2], 'Stage': stages[0], 'Partner': 'Pharma-Mfg'}, {'Product': products[2], 'Stage': stages[1], 'Partner': 'OligoSynth'},
-        {'Product': products[2], 'Stage': stages[2], 'Partner': 'Pharma-Mfg'}, {'Product': products[2], 'Stage': stages[3], 'Partner': 'VialFill Services'},
-        {'Product': products[0], 'Stage': stages[2], 'Partner': 'Pharma-Mfg'}, {'Product': products[1], 'Stage': stages[1], 'Partner': 'OligoSynth'},
-    ]
-
     batch_data = []
     static_now = pd.Timestamp('2023-10-27')
-    for i, record in enumerate(batch_data_structured):
+    for i in range(25): # Increased number of lots for better stats
+        prod = np.random.choice(products); stage = np.random.choice(stages); partner = np.random.choice(data['partners']['Partner'])
         status = np.random.choice(statuses, p=[0.3, 0.2, 0.1, 0.4])
-        created_date = static_now - pd.Timedelta(days=np.random.randint(5, 50))
-        tat_sla = data['partners'][data['partners']['Partner'] == record['Partner']]['TAT_SLA'].iloc[0]
+        created_date = static_now - pd.Timedelta(days=np.random.randint(5, 90))
+        # This is the key fix: Add TAT_SLA and Actual_TAT to the batches DataFrame
+        tat_sla = data['partners'][data['partners']['Partner'] == partner]['TAT_SLA'].iloc[0]
         actual_tat = np.random.randint(tat_sla - 5, tat_sla + 10) if status != 'Released' else np.random.randint(tat_sla - 7, tat_sla + 3)
-        lot_id = f"{record['Product'].split(' ')[0]}-{record['Stage'].split(' ')[0]}-{100+i}"
-        batch_data.append([lot_id, record['Product'], record['Stage'], record['Partner'], status, created_date, tat_sla, actual_tat])
+        lot_id = f"{prod.split(' ')[0]}-{stage.split(' ')[0]}-{100+i}"
+        batch_data.append([lot_id, prod, stage, partner, status, created_date, tat_sla, actual_tat])
     
     data['batches'] = pd.DataFrame(batch_data, columns=['Lot_ID', 'Product', 'Stage', 'Partner', 'Status', 'Date_Created', 'TAT_SLA', 'Actual_TAT'])
 

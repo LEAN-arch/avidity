@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- ATOMIC DATA INITIALIZATION FUNCTION (WITH STRUCTURED MOCK DATA) ---
+# --- ATOMIC DATA INITIALIZATION FUNCTION (CORRECTED WITH DETERMINISTIC DATES) ---
 @st.cache_data
 def generate_data():
     """Generates all necessary dataframes for the application."""
@@ -33,32 +33,22 @@ def generate_data():
     statuses = ['Testing in Progress', 'Data Review Pending', 'Awaiting Release', 'Released']
     
     # --- SME ENHANCEMENT: Structured Mock Data Generation ---
-    # This new method guarantees a complete 'story' for each product.
     batch_data_structured = [
-        # Complete chain for DM1
-        {'Product': products[0], 'Stage': stages[0], 'Partner': 'Pharma-Mfg'},
-        {'Product': products[0], 'Stage': stages[1], 'Partner': 'OligoSynth'},
-        {'Product': products[0], 'Stage': stages[2], 'Partner': 'Pharma-Mfg'},
-        {'Product': products[0], 'Stage': stages[3], 'Partner': 'VialFill Services'},
-        # Complete chain for DMD
-        {'Product': products[1], 'Stage': stages[0], 'Partner': 'Pharma-Mfg'},
-        {'Product': products[1], 'Stage': stages[1], 'Partner': 'OligoSynth'},
-        {'Product': products[1], 'Stage': stages[2], 'Partner': 'Pharma-Mfg'},
-        {'Product': products[1], 'Stage': stages[3], 'Partner': 'VialFill Services'},
-        # Complete chain for FSHD
-        {'Product': products[2], 'Stage': stages[0], 'Partner': 'Pharma-Mfg'},
-        {'Product': products[2], 'Stage': stages[1], 'Partner': 'OligoSynth'},
-        {'Product': products[2], 'Stage': stages[2], 'Partner': 'Pharma-Mfg'},
-        {'Product': products[2], 'Stage': stages[3], 'Partner': 'VialFill Services'},
-        # Add some extra in-progress lots for realism
-        {'Product': products[0], 'Stage': stages[2], 'Partner': 'Pharma-Mfg'},
-        {'Product': products[1], 'Stage': stages[1], 'Partner': 'OligoSynth'},
+        {'Product': products[0], 'Stage': stages[0], 'Partner': 'Pharma-Mfg'}, {'Product': products[0], 'Stage': stages[1], 'Partner': 'OligoSynth'},
+        {'Product': products[0], 'Stage': stages[2], 'Partner': 'Pharma-Mfg'}, {'Product': products[0], 'Stage': stages[3], 'Partner': 'VialFill Services'},
+        {'Product': products[1], 'Stage': stages[0], 'Partner': 'Pharma-Mfg'}, {'Product': products[1], 'Stage': stages[1], 'Partner': 'OligoSynth'},
+        {'Product': products[1], 'Stage': stages[2], 'Partner': 'Pharma-Mfg'}, {'Product': products[1], 'Stage': stages[3], 'Partner': 'VialFill Services'},
+        {'Product': products[2], 'Stage': stages[0], 'Partner': 'Pharma-Mfg'}, {'Product': products[2], 'Stage': stages[1], 'Partner': 'OligoSynth'},
+        {'Product': products[2], 'Stage': stages[2], 'Partner': 'Pharma-Mfg'}, {'Product': products[2], 'Stage': stages[3], 'Partner': 'VialFill Services'},
+        {'Product': products[0], 'Stage': stages[2], 'Partner': 'Pharma-Mfg'}, {'Product': products[1], 'Stage': stages[1], 'Partner': 'OligoSynth'},
     ]
 
     batch_data = []
+    # THIS IS THE KEY FIX: Use a fixed date to make data generation deterministic.
+    static_now = pd.Timestamp('2023-10-27')
     for i, record in enumerate(batch_data_structured):
         status = np.random.choice(statuses, p=[0.3, 0.2, 0.1, 0.4])
-        created_date = pd.Timestamp.now() - pd.Timedelta(days=np.random.randint(5, 50))
+        created_date = static_now - pd.Timedelta(days=np.random.randint(5, 50))
         tat_sla = data['partners'][data['partners']['Partner'] == record['Partner']]['TAT_SLA'].iloc[0]
         actual_tat = np.random.randint(tat_sla - 5, tat_sla + 10) if status != 'Released' else np.random.randint(tat_sla - 7, tat_sla + 3)
         lot_id = f"{record['Product'].split(' ')[0]}-{record['Stage'].split(' ')[0]}-{100+i}"
@@ -66,13 +56,10 @@ def generate_data():
     
     data['batches'] = pd.DataFrame(batch_data, columns=['Lot_ID', 'Product', 'Stage', 'Partner', 'Status', 'Date_Created', 'TAT_SLA', 'Actual_TAT'])
 
-    # Create deviations linked to the new, valid lot IDs
     valid_lot_ids = data['batches']['Lot_ID'].tolist()
     dev_data = []
     for i in range(15):
-        partner = np.random.choice(data['partners']['Partner'])
-        lot_id = np.random.choice(valid_lot_ids)
-        # Infer product from the valid Lot ID
+        partner = np.random.choice(data['partners']['Partner']); lot_id = np.random.choice(valid_lot_ids)
         prod_from_lot = [p for p in products if p.split(' ')[0] in lot_id][0]
         status = np.random.choice(['New Event', 'Investigation', 'CAPA Plan', 'Closed'], p=[0.1, 0.4, 0.2, 0.3])
         age = np.random.randint(1, 60)
@@ -121,7 +108,7 @@ with col4:
 with st.expander("SME Explanations for KPIs"):
     st.markdown("""
     - **Batches Pending QC Action:** Total number of lots across all products and stages that are currently in the QC workflow (Testing, Data Review, Release). *Relevance: Measures the overall workload and throughput of the QC function.*
-    - **Active Deviations/OOS:** Total number of open quality events (Out-of-Specification, Deviations). *Relevance: A direct measure of the current problem-solving burden and potential quality risks across the network. Governed by **cGMP** and **ICH Q10**.*
+    - **Active Deviations/OOS:** Total number of open quality events. *Relevance: A direct measure of the current problem-solving burden and potential quality risks across the network. Governed by **cGMP** and **ICH Q10**.*
     - **Lots At-Risk of Delay (TAT):** Number of active lots where the testing Turnaround Time has exceeded the contractual Service Level Agreement (SLA). *Relevance: A leading indicator of potential supply chain disruptions and timeline misses.*
     - **Upcoming Stability Pulls:** Number of scheduled stability test points in the next 14 days. *Relevance: Proactively highlights critical, time-sensitive activities required for regulatory filings and product shelf-life determination per **ICH Q1A(R2)**.*
     """)
@@ -134,8 +121,7 @@ with col1:
     
     perf_summary = []
     for partner_name in partners['Partner']:
-        partner_batches = batches[batches['Partner'] == partner_name]
-        partner_devs = deviations[deviations['Partner'] == partner_name]
+        partner_batches = batches[batches['Partner'] == partner_name]; partner_devs = deviations[deviations['Partner'] == partner_name]
         on_time_rate = (partner_batches['Actual_TAT'] <= partner_batches['TAT_SLA']).mean() * 100 if not partner_batches.empty else 100
         oos_rate = (partner_devs['Type'] == 'OOS').mean() * 100 if not partner_devs.empty else 0
         late_devs = partner_devs[partner_devs['Age_Days'] > 30].shape[0]

@@ -1,17 +1,6 @@
 # ==============================================================================
 # 🧬 Avidity QC Command Center - Main Application
 #
-# Author: Integrated & Optimized by AI Assistant
-# Last Updated: 2023-10-28 (Definitively Corrected Version)
-#
-# Description:
-# This is the main entry point for the Streamlit multi-page application.
-# It is responsible for:
-#   1. Setting the global page configuration.
-#   2. Injecting the visitor analytics tracker.
-#   3. Generating and caching all application data (THE SINGLE SOURCE OF TRUTH).
-#   4. Initializing the data into Streamlit's session state.
-#   5. Rendering the main "Global Command Center" dashboard page.
 # ==============================================================================
 
 import streamlit as st

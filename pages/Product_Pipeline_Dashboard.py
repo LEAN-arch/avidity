@@ -54,11 +54,13 @@ st.markdown("""
 # --- CORRECTED LOGIC FOR ArrowInvalid Error ---
 # Data is now stored with numeric types. Display formatting is handled by Streamlit.
 cqa_data = [
-    {'CQA': 'Purity by RP-HPLC (%)', 'Intermediate Spec': '≥ 98.0', 'DS Spec': '≥ 97.0', 'DP Spec': '≥ 97.0', 'DS Result': 98.1, 'DP Result': 97.8, 'Status': '✅ In Trend'},
-    {'CQA': 'Conjugation Efficiency (%)', 'Intermediate Spec': 'N/A', 'DS Spec': 'Report', 'DP Spec': 'Report', 'DS Result': 92.5, 'DP Result': 92.3, 'Status': '✅ In Trend'},
-    {'CQA': 'Aggregate Content (%)', 'Intermediate Spec': '≤ 1.0', 'DS Spec': '≤ 2.0', 'DP Spec': '≤ 2.5', 'DS Result': 1.5, 'DP Result': 2.2, 'Status': '⚠️ Trending High'},
-    {'CQA': 'Bioactivity (EC50, nM)', 'Intermediate Spec': 'N/A', 'DS Spec': 'Report', 'DP Spec': '≤ 10.0', 'DS Result': 4.5, 'DP Result': 4.8, 'Status': '✅ In Trend'},
-    {'CQA': 'Endotoxin (EU/mL)', 'Intermediate Spec': 'N/A', 'DS Spec': '≤ 5.0', 'DP Spec': '≤ 2.5', 'DS Result': 0.4, 'DP Result': 0.3, 'Status': '✅ In Trend'}
+    {'CQA': 'Purity by RP-HPLC (%)', 'DS Spec': '≥ 97.0', 'DP Spec': '≥ 97.0', 'DS Result': 98.1, 'DP Result': 97.8, 'Status': '✅ In Trend'},
+    {'CQA': 'Conjugation Efficiency (%)', 'DS Spec': 'Report', 'DP Spec': 'Report', 'DS Result': 92.5, 'DP Result': 92.3, 'Status': '✅ In Trend'},
+    {'CQA': 'Aggregate Content (%)', 'DS Spec': '≤ 2.0', 'DP Spec': '≤ 2.5', 'DS Result': 1.5, 'DP Result': 2.2, 'Status': '⚠️ Trending High'},
+    {'CQA': 'Bioactivity (EC50, nM)', 'DS Spec': 'Report', 'DP Spec': '≤ 10.0', 'DS Result': 4.5, 'DP Result': 4.8, 'Status': '✅ In Trend'},
+    {'CQA': 'Endotoxin (EU/mL)', 'DS Spec': '≤ 5.0', 'DP Spec': '≤ 2.5', 'DS Result': 0.4, 'DP Result': 0.3, 'Status': '✅ In Trend'},
+    # NEW: Microbiology Integration
+    {'CQA': 'Bioburden (CFU/10mL)', 'DS Spec': '≤ 10', 'DP Spec': 'N/A (Sterile)', 'DS Result': 1.0, 'DP Result': 0.0, 'Status': '✅ In Trend'}
 ]
 cqa_df = pd.DataFrame(cqa_data)
 
@@ -66,6 +68,10 @@ st.dataframe(
     cqa_df,
     use_container_width=True,
     column_config={
+        "CQA": st.column_config.TextColumn(
+            "Critical Quality Attribute",
+            width="large"
+        ),
         "DS Result": st.column_config.NumberColumn(
             "Drug Substance Result",
             format="%.1f",

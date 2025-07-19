@@ -76,7 +76,7 @@ with tab_perf:
         if not partner_devs.empty:
             total_devs = len(partner_devs)
             oos_count = len(partner_devs[partner_devs['Type'] == 'OOS'])
-            oos_rate = (oos_count / total_devs) * 100
+            oos_rate = (oos_count / total_devs) * 100 if total_devs > 0 else 0
         else:
             oos_rate = 0
         st.metric("Out-of-Specification (OOS) Rate", f"{oos_rate:.1f}%")
@@ -104,9 +104,13 @@ with tab_perf:
             sigma = process_data.std()
             
             # Cpk calculation
-            cpu = (usl - mu) / (3 * sigma)
-            cpl = (mu - lsl) / (3 * sigma)
-            cpk = min(cpu, cpl)
+            if sigma > 0:
+                cpu = (usl - mu) / (3 * sigma)
+                cpl = (mu - lsl) / (3 * sigma)
+                cpk = min(cpu, cpl)
+            else: # Handle case where all data points are the same
+                cpk = float('inf')
+
 
             fig_cpk = ff.create_distplot(
                 [process_data.tolist()], ['Purity Data'],
@@ -129,7 +133,7 @@ with tab_perf:
         st.markdown("- **Why (Actionability):** This provides objective, visual evidence to 'hold partners accountable'. A distribution skewed right of the SLA line is clear justification for escalating performance issues.")
         
         if not partner_batches.empty:
-            # FIX: Get the SLA value safely, even if it varies (though it doesn't in this model).
+            # Get the SLA value safely.
             sla = partner_batches['TAT_SLA'].iloc[0]
             fig_hist = px.histogram(
                 partner_batches,

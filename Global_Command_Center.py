@@ -16,7 +16,7 @@ st.set_page_config(
 # --- ATOMIC DATA INITIALIZATION FUNCTION (DEFINITIVE CORRECTION) ---
 @st.cache_data
 def generate_data():
-    """Generates a fully integrated, traceable, and context-aware dataset."""
+    """Generates all necessary dataframes for the application with a corrected data model."""
     data = {}
     data['partners'] = pd.DataFrame({
         'Partner': ['Pharma-Mfg', 'BioTest Labs', 'Gene-Chem', 'OligoSynth', 'VialFill Services'],
@@ -32,37 +32,29 @@ def generate_data():
     stages = ['Antibody Intermediate', 'Oligonucleotide', 'Drug Substance', 'Drug Product']
     statuses = ['Testing in Progress', 'Data Review Pending', 'Awaiting Release', 'Released']
     
-    # --- TRUE LOT GENEALOGY GENERATION ---
-    batch_data = []
-    lot_lineage = []
-    lot_counter = 100
-    static_now = pd.Timestamp('2023-10-27')
-    
-    for product in products:
-        # Create a full chain for each product
-        mab_lot = f"{product.split(' ')[0]}-Antibody-{lot_counter}"; lot_counter += 1
-        oligo_lot = f"{product.split(' ')[0]}-Oligo-{lot_counter}"; lot_counter += 1
-        ds_lot = f"{product.split(' ')[0]}-DS-{lot_counter}"; lot_counter += 1
-        dp_lot = f"{product.split(' ')[0]}-DP-{lot_counter}"; lot_counter += 1
-        
-        batch_data.extend([
-            {'Lot_ID': mab_lot, 'Product': product, 'Stage': 'Antibody Intermediate', 'Partner': 'Pharma-Mfg', 'Status': 'Released', 'Date_Created': static_now - pd.Timedelta(days=np.random.randint(60, 90))},
-            {'Lot_ID': oligo_lot, 'Product': product, 'Stage': 'Oligonucleotide', 'Partner': 'OligoSynth', 'Status': 'Released', 'Date_Created': static_now - pd.Timedelta(days=np.random.randint(60, 90))},
-            {'Lot_ID': ds_lot, 'Product': product, 'Stage': 'Drug Substance', 'Partner': 'Pharma-Mfg', 'Status': 'Released', 'Date_Created': static_now - pd.Timedelta(days=np.random.randint(30, 60))},
-            {'Lot_ID': dp_lot, 'Product': product, 'Stage': 'Drug Product', 'Partner': 'VialFill Services', 'Status': np.random.choice(['Awaiting Release', 'Released']), 'Date_Created': static_now - pd.Timedelta(days=np.random.randint(5, 30))}
-        ])
-        
-        # Create the lineage links
-        lot_lineage.extend([
-            {'parent_lot': mab_lot, 'child_lot': ds_lot},
-            {'parent_lot': oligo_lot, 'child_lot': ds_lot},
-            {'parent_lot': ds_lot, 'child_lot': dp_lot}
-        ])
+    batch_data_structured = [
+        {'Product': products[0], 'Stage': stages[0], 'Partner': 'Pharma-Mfg'}, {'Product': products[0], 'Stage': stages[1], 'Partner': 'OligoSynth'},
+        {'Product': products[0], 'Stage': stages[2], 'Partner': 'Pharma-Mfg'}, {'Product': products[0], 'Stage': stages[3], 'Partner': 'VialFill Services'},
+        {'Product': products[1], 'Stage': stages[0], 'Partner': 'Pharma-Mfg'}, {'Product': products[1], 'Stage': stages[1], 'Partner': 'OligoSynth'},
+        {'Product': products[1], 'Stage': stages[2], 'Partner': 'Pharma-Mfg'}, {'Product': products[1], 'Stage': stages[3], 'Partner': 'VialFill Services'},
+        {'Product': products[2], 'Stage': stages[0], 'Partner': 'Pharma-Mfg'}, {'Product': products[2], 'Stage': stages[1], 'Partner': 'OligoSynth'},
+        {'Product': products[2], 'Stage': stages[2], 'Partner': 'Pharma-Mfg'}, {'Product': products[2], 'Stage': stages[3], 'Partner': 'VialFill Services'},
+        {'Product': products[0], 'Stage': stages[2], 'Partner': 'Pharma-Mfg'}, {'Product': products[1], 'Stage': stages[1], 'Partner': 'OligoSynth'},
+    ]
 
-    data['batches'] = pd.DataFrame(batch_data)
-    # THIS IS THE KEY FIX: Add the lot_lineage DataFrame to the data dictionary
-    data['lot_lineage'] = pd.DataFrame(lot_lineage)
+    batch_data = []
+    static_now = pd.Timestamp('2023-10-27')
+    for i, record in enumerate(batch_data_structured):
+        status = np.random.choice(statuses, p=[0.3, 0.2, 0.1, 0.4])
+        created_date = static_now - pd.Timedelta(days=np.random.randint(5, 50))
+        # This is the key fix: Add TAT_SLA and Actual_TAT to the batches DataFrame
+        tat_sla = data['partners'][data['partners']['Partner'] == record['Partner']]['TAT_SLA'].iloc[0]
+        actual_tat = np.random.randint(tat_sla - 5, tat_sla + 10) if status != 'Released' else np.random.randint(tat_sla - 7, tat_sla + 3)
+        lot_id = f"{record['Product'].split(' ')[0]}-{record['Stage'].split(' ')[0]}-{100+i}"
+        batch_data.append([lot_id, record['Product'], record['Stage'], record['Partner'], status, created_date, tat_sla, actual_tat])
     
+    data['batches'] = pd.DataFrame(batch_data, columns=['Lot_ID', 'Product', 'Stage', 'Partner', 'Status', 'Date_Created', 'TAT_SLA', 'Actual_TAT'])
+
     valid_lot_ids = data['batches']['Lot_ID'].tolist()
     dev_data = []
     for i in range(15):
@@ -104,9 +96,8 @@ with col2:
     active_devs = deviations[deviations['Status'] != 'Closed'].shape[0]
     st.metric("Active Deviations/OOS", active_devs)
 with col3:
-    # Use a simple but effective calculation for the high-level KPI
-    late_lots_count = batches[batches['Status'] != 'Released'].shape[0] // 3 
-    st.metric("Lots At-Risk of Delay (TAT)", late_lots_count, delta=f"{late_lots_count - 2}", delta_color="inverse")
+    at_risk_lots = batches[(batches['Status'] != 'Released') & (batches['Actual_TAT'] > batches['TAT_SLA'])].shape[0]
+    st.metric("Lots At-Risk of Delay (TAT)", at_risk_lots, delta=f"{at_risk_lots - 2}", delta_color="inverse")
 with col4:
     total_pulls = 7
     st.metric("Upcoming Stability Pulls (14d)", total_pulls)
@@ -128,13 +119,13 @@ with col1:
     perf_summary = []
     for partner_name in partners['Partner']:
         partner_batches = batches[batches['Partner'] == partner_name]; partner_devs = deviations[deviations['Partner'] == partner_name]
-        on_time_rate = np.random.uniform(92.0, 99.8) # Simulated for display
+        on_time_rate = (partner_batches['Actual_TAT'] <= partner_batches['TAT_SLA']).mean() * 100 if not partner_batches.empty else 100
         oos_rate = (partner_devs['Type'] == 'OOS').mean() * 100 if not partner_devs.empty else 0
         late_devs = partner_devs[partner_devs['Age_Days'] > 30].shape[0]
         perf_summary.append([partner_name, on_time_rate, oos_rate, late_devs])
     perf_df = pd.DataFrame(perf_summary, columns=["Partner", "On-Time Rate (%)", "OOS Rate (%)", "Deviations >30d"])
     st.dataframe(perf_df, use_container_width=True,
-                 column_config={"On-Time Rate (%)": st.column_config.ProgressColumn(format="%.1f%%", min_value=0, max_value=100)})
+                 column_config={"On-Time Rate (%)": st.column_config.ProgressColumn(format="%.0f%%", min_value=0, max_value=100)})
     
     st.subheader("Release Velocity & Forecast (Last 8 Weeks)")
     st.markdown("- **Why:** This chart tracks QC throughput against our supply plan. The **ML-based forecast (orange line)** gives us a predictive view, allowing us to proactively manage resources to prevent future bottlenecks.")
@@ -149,5 +140,6 @@ with col1:
 
 with col2:
     st.subheader("Global Partner Network")
+    # This line will now work correctly
     st.map(partners[['lat', 'lon']], zoom=1)
     st.caption("Partner locations are color-coded by their current overall performance status.")

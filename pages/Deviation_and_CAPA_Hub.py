@@ -1,5 +1,6 @@
 # ==============================================================================
 # 🧬 Page 1: Deviation & CAPA Management Hub
+#
 # ==============================================================================
 
 import streamlit as st
@@ -13,14 +14,11 @@ st.set_page_config(
 )
 
 # --- 1. ROBUST STATE CHECK ---
-# Verifies that the 'app_data' key has been initialized in the session state.
-# If not, it displays an error and stops the page from rendering.
 if 'app_data' not in st.session_state:
     st.error("🚨 Application data not loaded. Please return to the 'Global Command Center' home page to initialize the app.")
     st.stop()
 
 # --- 2. DATA UNPACKING ---
-# Unpack dataframes from the central session state for use in this page.
 app_data = st.session_state['app_data']
 deviations_df = app_data['deviations']
 batches_df = app_data['batches']
@@ -29,7 +27,6 @@ batches_df = app_data['batches']
 st.markdown("# 🗂️ Deviation & CAPA Management Hub")
 st.markdown("This module provides a central workspace for managing quality events across the entire CMO/CTO network and for identifying systemic opportunities for improvement.")
 
-# --- KANBAN BOARD SECTION ---
 st.header("Deviation Workflow (Kanban Board)")
 st.caption("This board provides a visual representation of all active investigations, helping to manage workload, identify bottlenecks, and ensure timely closure of quality events.")
 
@@ -48,20 +45,29 @@ for i, stage in enumerate(stages):
         for dev in devs_in_stage.to_dict('records'):
             age = dev['Age_Days']
             
-            # DEFINITIVE TypeError FIX: This logic correctly separates the calls.
-            # `st.error` and `st.warning` are called without the 'border' argument.
-            # `st.container` is called with the 'border' argument.
+            # ======================================================================
+            # DEFINITIVE TypeError FIX: st.error() and st.warning() are not
+            # context managers and cannot be used with a 'with' statement. They
+            # are direct functions that take the message body as an argument.
+            # This corrected logic passes the formatted string directly to them,
+            # which is the correct usage and resolves the crash.
+            # ======================================================================
             if age > 60:
-                with st.error():
-                    st.markdown(f"**{dev['Deviation_ID']}** 🚨")
-                    st.caption(f"{dev['Partner']}")
-                    st.caption(f"`{age} days old`")
+                card_body = f"""
+                **{dev['Deviation_ID']}** 🚨\n
+                {dev['Partner']}\n
+                `{age} days old`
+                """
+                st.error(card_body)
             elif age > 30:
-                with st.warning():
-                    st.markdown(f"**{dev['Deviation_ID']}** ⚠️")
-                    st.caption(f"{dev['Partner']}")
-                    st.caption(f"`{age} days old`")
+                card_body = f"""
+                **{dev['Deviation_ID']}** ⚠️\n
+                {dev['Partner']}\n
+                `{age} days old`
+                """
+                st.warning(card_body)
             else:
+                # st.container is a context manager and is used correctly here.
                 with st.container(border=True):
                     st.markdown(f"**{dev['Deviation_ID']}**")
                     st.caption(f"{dev['Partner']}")

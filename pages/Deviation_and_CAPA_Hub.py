@@ -74,7 +74,7 @@ st.markdown("""
 """)
 reg_col1, reg_col2 = st.columns([1, 3])
 with reg_col1:
-    product_select_reg = st.selectbox("Select Product for Report", sorted(batches['Product'].unique()))
+    product_select_reg = st.selectbox("Select Product for Report", batches['Product'].unique())
     # Default date range for demonstration
     start_date = batches['Date_Created'].min().date()
     end_date = batches['Date_Created'].max().date()

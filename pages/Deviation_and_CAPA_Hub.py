@@ -2,7 +2,7 @@
 # 🧬 Page 1: Deviation & CAPA Management Hub
 #
 # Author: Integrated & Optimized by AI Assistant
-# Last Updated: 2023-10-27
+# Last Updated: 2023-10-28 (Definitively Corrected Version)
 #
 # Description:
 # This page provides a central workspace for managing quality events (deviations,
@@ -45,99 +45,6 @@ st.markdown("This module provides a central workspace for managing quality event
 st.header("Deviation Workflow (Kanban Board)")
 st.caption("This board provides a visual representation of all active investigations, helping to manage workload, identify bottlenecks, and ensure timely closure of quality events.")
 
-# FIX: The stages list now perfectly matches the statuses generated in the master data.
-stages = ['New Event', 'Investigation', 'CAPA Plan', 'Effectiveness Check', 'Closed']
-cols = st.columns(len(stages))
-
-# OPTIMIZATION: Instead of filtering the dataframe in a loop, group by 'Status' once.
-# This is significantly more performant, especially with a large number of deviations.
-grouped_devs = {status: group for status, group in deviations_df.groupby('Status')}
-
-for i, stage in enumerate(stages):
-    with cols[i]:
-        # Use a more descriptive header with the count of items in that stage.
-        count = len(grouped_devs.get(stage, []))
-        st.subheader(f"{stage} ({count})")
-        
-        # Get the pre-filtered dataframe for the current stage.
-        devs_in_stage = grouped_devs.get(stage, pd.DataFrame())
-
-        # OPTIMIZATION: Use to_dict('records') instead of iterrows for faster iteration.
-        for dev in devs_in_stage.to_dict('records'):
-            age = dev['Age_Days']
-            # Color-code cards by age to visually flag overdue items.
-            if age > 60:
-                container = st.error
-                icon = "🚨"
-            elif age > 30:
-                container = st.warning
-                icon = "⚠️"
-            else:
-                container = st.container
-                icon = ""
-
-            with container(border=(icon == "")):
-                st.markdown(f"**{dev['Deviation_ID']}** {icon}")
-                st.caption(f"{dev['Partner']}")
-                st.caption(f"`{age} days old`")
-st.divider()
-
-# --- ANALYTICS SECTION ---
-col1, col2 = st.columns(2)
-with col1:
-    st.header("Actionable Analytics")
-    st.subheader("OOS Root Cause Pareto Chart")
-    st.markdown("- **Why (Actionability):** This Pareto chart is a powerful tool for continuous improvement per **ICH Q10**. By identifying the most frequent root causes, we can focus our systemic improvement efforts for the greatest impact.")
-
-    # DATA-DRIVEN: This chart is no longer a simulation. It's powered by the 'Root_Cause'
-    # column that was added to the deviations_df in the master data generator.
-    oos_devs = deviations_df[deviations_df['Type'] == 'OOS']
-    if not oos_devs.empty:
-        rc_counts = oos_devs['Root_Cause'].value_counts().reset_index()
-        rc_counts.columns = ['Root Cause', 'Count']
-        # ==============================================================================
-# 🧬 Page 1: Deviation & CAPA Management Hub
-#
-# Author: Integrated & Optimized by AI Assistant
-# Last Updated: 2023-10-27
-#
-# Description:
-# This page provides a central workspace for managing quality events (deviations,
-# OOS, OOT) across the external network. It includes:
-#   - A dynamic Kanban board to visualize the workflow.
-#   - Actionable analytics like a Root Cause Pareto chart.
-#   - A tool to generate data summaries for regulatory submissions.
-#
-# All data is sourced from the session state initialized in Command_Center.py.
-# ==============================================================================
-
-import streamlit as st
-import pandas as pd
-import plotly.express as px
-
-st.set_page_config(
-    page_title="Deviation & CAPA Hub",
-    page_icon="🗂️",
-    layout="wide"
-)
-
-# --- 1. ROBUST STATE CHECK ---
-if 'app_data' not in st.session_state:
-    st.error("🚨 Application data not loaded. Please return to the 'Global Command Center' home page to initialize the app.")
-    st.stop()
-
-# --- 2. DATA UNPACKING ---
-app_data = st.session_state['app_data']
-deviations_df = app_data['deviations']
-batches_df = app_data['batches']
-
-# --- 3. UI RENDER ---
-st.markdown("# 🗂️ Deviation & CAPA Management Hub")
-st.markdown("This module provides a central workspace for managing quality events across the entire CMO/CTO network and for identifying systemic opportunities for improvement.")
-
-st.header("Deviation Workflow (Kanban Board)")
-st.caption("This board provides a visual representation of all active investigations, helping to manage workload, identify bottlenecks, and ensure timely closure of quality events.")
-
 stages = ['New Event', 'Investigation', 'CAPA Plan', 'Effectiveness Check', 'Closed']
 cols = st.columns(len(stages))
 
@@ -153,11 +60,9 @@ for i, stage in enumerate(stages):
         for dev in devs_in_stage.to_dict('records'):
             age = dev['Age_Days']
             
-            # ======================================================================
-            # FATAL ERROR FIX: Replaced dynamic container logic with a direct
-            # if/elif/else structure. st.error() and st.warning() do not accept
-            # the 'border' argument, which was causing the TypeError.
-            # ======================================================================
+            # DEFINITIVE TypeError FIX: This logic correctly separates the calls.
+            # `st.error` and `st.warning` are called without the 'border' argument.
+            # `st.container` is called with the 'border' argument.
             if age > 60:
                 with st.error():
                     st.markdown(f"**{dev['Deviation_ID']}** 🚨")
@@ -173,9 +78,9 @@ for i, stage in enumerate(stages):
                     st.markdown(f"**{dev['Deviation_ID']}**")
                     st.caption(f"{dev['Partner']}")
                     st.caption(f"`{age} days old`")
-
 st.divider()
 
+# --- ANALYTICS SECTION ---
 col1, col2 = st.columns(2)
 with col1:
     st.header("Actionable Analytics")
@@ -215,6 +120,7 @@ with col2:
 
 st.divider()
 
+# --- REGULATORY SUPPORT TOOL SECTION ---
 st.header("CMC Regulatory Support")
 st.markdown("""
 - **What:** A tool to collate all relevant QC data for a specific product over a defined period.
